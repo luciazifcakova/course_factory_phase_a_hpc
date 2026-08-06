@@ -1,0 +1,15 @@
+pydantic<3,>=2.7
+requests<3,>=2.31
+beautifulsoup4<5,>=4.12
+python-pptx<2,>=1.0
+PyYAML<7,>=6
+python-dotenv<2,>=1
+
+[chroma]
+chromadb<2,>=0.5
+
+[dev]
+pytest<9,>=8
+
+[docx]
+python-docx<2,>=1.1

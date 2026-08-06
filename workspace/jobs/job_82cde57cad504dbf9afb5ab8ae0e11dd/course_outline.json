@@ -1,0 +1,165 @@
+{
+  "title": "Introduction to Data Visualization with ggplot2",
+  "audience": "Scientists new to R visualization",
+  "language": "English",
+  "modules": [
+    {
+      "module_id": "MOD-001",
+      "title": "Introduction to ggplot2 and the Grammar of Graphics",
+      "description": "Understand the foundational principles of ggplot2 and the grammar of graphics approach to visualization.",
+      "lessons": [
+        {
+          "lesson_id": "LES-001",
+          "title": "Overview of ggplot2 and the Grammar of Graphics",
+          "duration_minutes": 30,
+          "objectives": [
+            "Understand the layered approach of ggplot2",
+            "Learn the core components of the grammar of graphics"
+          ],
+          "practical": true,
+          "requires_live_demo": false,
+          "required_packages": [
+            "ggplot2"
+          ],
+          "prerequisites": [],
+          "knowledge_ids": [
+            "DOC-001"
+          ]
+        },
+        {
+          "lesson_id": "LES-002",
+          "title": "Creating First Plots with ggplot2",
+          "duration_minutes": 30,
+          "objectives": [
+            "Generate simple plots using ggplot2",
+            "Apply data and aesthetic mappings"
+          ],
+          "practical": true,
+          "requires_live_demo": false,
+          "required_packages": [
+            "ggplot2"
+          ],
+          "prerequisites": [
+            "LES-001"
+          ],
+          "knowledge_ids": [
+            "DOC-002"
+          ]
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "module_id": "MOD-002",
+      "title": "Creating Common Plot Types with ggplot2",
+      "description": "Construct essential visualization types such as scatter plots, bar charts, and histograms using ggplot2.",
+      "lessons": [
+        {
+          "lesson_id": "LES-003",
+          "title": "Scatter Plots and Bar Charts",
+          "duration_minutes": 30,
+          "objectives": [
+            "Create scatter plots and bar charts",
+            "Customize plot elements (e.g., colors, labels)"
+          ],
+          "practical": true,
+          "requires_live_demo": false,
+          "required_packages": [
+            "ggplot2"
+          ],
+          "prerequisites": [],
+          "knowledge_ids": [
+            "DOC-003"
+          ]
+        },
+        {
+          "lesson_id": "LES-004",
+          "title": "Histograms and Other Plot Types",
+          "duration_minutes": 30,
+          "objectives": [
+            "Generate histograms and boxplots",
+            "Interpret plot outputs for data insights"
+          ],
+          "practical": true,
+          "requires_live_demo": false,
+          "required_packages": [
+            "ggplot2"
+          ],
+          "prerequisites": [
+            "LES-003"
+          ],
+          "knowledge_ids": [
+            "DOC-004"
+          ]
+        }
+      ],
+      "prerequisites": [
+        "MOD-001"
+      ]
+    },
+    {
+      "module_id": "MOD-003",
+      "title": "Customization, Themes, and Troubleshooting",
+      "description": "Refine visualizations with themes, annotations, and troubleshoot common visualization challenges.",
+      "lessons": [
+        {
+          "lesson_id": "LES-005",
+          "title": "Customizing Aesthetics and Themes",
+          "duration_minutes": 30,
+          "objectives": [
+            "Modify plot themes and annotations",
+            "Enhance visual clarity for scientific communication"
+          ],
+          "practical": true,
+          "requires_live_demo": false,
+          "required_packages": [
+            "ggplot2"
+          ],
+          "prerequisites": [],
+          "knowledge_ids": [
+            "DOC-005"
+          ]
+        },
+        {
+          "lesson_id": "LES-006",
+          "title": "Troubleshooting and Best Practices",
+          "duration_minutes": 30,
+          "objectives": [
+            "Interpret and resolve common visualization errors",
+            "Apply best practices for scientific data communication"
+          ],
+          "practical": true,
+          "requires_live_demo": false,
+          "required_packages": [
+            "ggplot2"
+          ],
+          "prerequisites": [
+            "LES-005"
+          ],
+          "knowledge_ids": [
+            "DOC-006"
+          ]
+        }
+      ],
+      "prerequisites": [
+        "MOD-002"
+      ]
+    }
+  ],
+  "learning_objectives": [
+    "Understand the grammar of graphics and ggplot2's layered approach to visualization",
+    "Create common plot types (scatter plots, bar charts, histograms, etc.) using ggplot2",
+    "Customize plot aesthetics, themes, and annotations for effective scientific communication",
+    "Interpret and troubleshoot common visualization challenges"
+  ],
+  "required_packages": [
+    "ggplot2"
+  ],
+  "total_duration_minutes": 180,
+  "assumptions": [
+    "Participants have R installed and basic data manipulation skills",
+    "Participants have access to a computer with internet connectivity"
+  ],
+  "references": [],
+  "version": "1.0"
+}

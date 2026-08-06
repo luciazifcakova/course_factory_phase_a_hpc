@@ -1,0 +1,2 @@
+[console_scripts]
+course-factory = course_factory.__main__:main

@@ -1,3 +1,6 @@
+from .lesson_content_models import LessonContent, LessonContentSet, LessonSection, PracticalActivity
+from .lesson_generation_agent import LessonGenerationAgent
+from .lesson_markdown_renderer import LessonMarkdownRenderer
 from .api import CourseFactoryAPI
 from .course_request_models import CreateCourseRequest
 from .course_response_models import (

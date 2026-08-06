@@ -9,3 +9,5 @@ required_packages:
 output_formats:
   - course_specification
   - course_outline
+  - lesson_content
+  - markdown_lessons

@@ -1,0 +1,28 @@
+{
+  "title": "Introduction to Data Visualization with ggplot2",
+  "topic": "Data Visualization with ggplot2",
+  "audience": "Scientists new to R visualization",
+  "duration_minutes": 180,
+  "language": "English",
+  "delivery_mode": "online",
+  "level": "beginner",
+  "prerequisites": [
+    "Basic knowledge of R programming language"
+  ],
+  "learning_objectives": [
+    "Understand the grammar of graphics framework in ggplot2",
+    "Create common visualization types (scatter plots, bar charts, etc.)",
+    "Customize plot aesthetics and themes",
+    "Interpret and troubleshoot common visualization issues"
+  ],
+  "required_packages": [
+    "ggplot2"
+  ],
+  "exercise_count": 4,
+  "assumptions": [
+    "Participants have R installed and basic data analysis experience",
+    "Familiarity with tidyverse data structures (data frames)"
+  ],
+  "clarification_required": false,
+  "clarification_question": null
+}

@@ -1,0 +1,306 @@
+{
+  "course_title": "Introduction to Data Visualization with ggplot2",
+  "lessons": [
+    {
+      "lesson_id": "LES-001",
+      "title": "Overview of ggplot2 and the Grammar of Graphics",
+      "summary": "Introduces the foundational principles of ggplot2, emphasizing its layered architecture and the Grammar of Graphics framework for creating visualizations.",
+      "sections": [
+        {
+          "heading": "The Grammar of Graphics",
+          "content": "The Grammar of Graphics is a systematic approach to building visualizations by combining data, visual properties (aesthetics), and geometric objects (geoms). This framework forms the basis of ggplot2, allowing users to construct plots through a series of logical layers.",
+          "bullet_points": [
+            "Data: The dataset used for visualization",
+            "Aesthetics: Mapping data variables to visual properties (e.g., x/y position, color, size)",
+            "Geoms: The visual elements representing data (e.g., points, bars, lines)"
+          ]
+        },
+        {
+          "heading": "Layered Approach in ggplot2",
+          "content": "ggplot2 builds plots incrementally by adding layers that define different aspects of the visualization. Each layer can modify the plot's appearance or add new information, such as background grids, annotations, or statistical transformations.",
+          "bullet_points": [
+            "Base layer: Initialize the plot with `ggplot()` and specify the dataset",
+            "Aesthetic layer: Define variable-to-visual-property mappings with `aes()`",
+            "Geom layer: Add geometric objects using functions like `geom_point()` or `geom_bar()`"
+          ]
+        }
+      ],
+      "key_takeaways": [
+        "ggplot2 uses the Grammar of Graphics to create visualizations through layered components",
+        "Plots are constructed by combining data, aesthetics, and geometric objects",
+        "Customization is achieved by adding or modifying layers incrementally"
+      ],
+      "practical_activity": {
+        "title": "Create a Basic Scatter Plot",
+        "instructions": [
+          "Load the `ggplot2` package and access the built-in `mtcars` dataset",
+          "Use `ggplot()` to initialize the plot, mapping `wt` (weight) to x-axis and `mpg` (miles per gallon) to y-axis with `aes()`",
+          "Add a geom layer using `geom_point()` to create the scatter plot"
+        ],
+        "expected_result": "A scatter plot displaying the relationship between vehicle weight and fuel efficiency, with points representing individual cars",
+        "estimated_minutes": 15
+      },
+      "instructor_notes": [
+        "Ensure learners understand that `ggplot2` requires explicit specification of all plot components",
+        "Remind learners to check for dataset availability if using `mtcars` (it is included in `ggplot2`)"
+      ],
+      "source_ids": [
+        "DOC-001"
+      ]
+    },
+    {
+      "lesson_id": "LES-002",
+      "title": "Creating First Plots with ggplot2",
+      "summary": "Learn to generate basic visualizations using ggplot2, focusing on data mapping and essential geometric objects.",
+      "sections": [
+        {
+          "heading": "Understanding ggplot2's Layered Approach",
+          "content": "ggplot2 builds plots through layers: a base dataset, aesthetic mappings, and geometric objects. Start with `ggplot()` to initialize a plot, then add layers using functions like `geom_point()` or `geom_bar()`. This approach allows systematic customization of visual elements.",
+          "bullet_points": [
+            "Base plot created with `ggplot(data = <dataset>)`",
+            "Layers added using `geom_*()` functions for different plot types"
+          ]
+        },
+        {
+          "heading": "Mapping Data to Aesthetics",
+          "content": "Use `aes()` to define how variables in your dataset map to visual properties (aesthetics) like x/y positions, color, or size. For example, `aes(x = variable1, y = variable2)` specifies a scatter plot's axes.",
+          "bullet_points": [
+            "Aesthetic mappings are defined within `aes()`",
+            "Mapped variables must exist in the dataset"
+          ]
+        },
+        {
+          "heading": "Creating Your First Plot",
+          "content": "Combine `ggplot()` with a geometric function to generate a plot. For instance, `ggplot(data = df, aes(x = xvar, y = yvar)) + geom_point()` creates a scatter plot. Customize further with themes or labels using additional functions.",
+          "bullet_points": []
+        }
+      ],
+      "key_takeaways": [
+        "ggplot2 uses a layered system for building plots",
+        "Data-aesthetic mappings are defined with `aes()`",
+        "Common geometric objects include `geom_point()` for scatter plots and `geom_bar()` for bar charts"
+      ],
+      "practical_activity": {
+        "title": "Generate a Scatter Plot",
+        "instructions": [
+          "Load the `ggplot2` package and a sample dataset (e.g., `mtcars`)",
+          "Create a scatter plot mapping `wt` (weight) to x-axis and `mpg` (miles per gallon) to y-axis using `geom_point()`"
+        ],
+        "expected_result": "A scatter plot displaying the relationship between vehicle weight and fuel efficiency, with points colored by default",
+        "estimated_minutes": 15
+      },
+      "instructor_notes": [
+        "Ensure learners have completed LES-001 prerequisite material on ggplot2 fundamentals",
+        "Remind learners to install `ggplot2` if not already done"
+      ],
+      "source_ids": [
+        "DOC-002"
+      ]
+    },
+    {
+      "lesson_id": "LES-003",
+      "title": "Scatter Plots and Bar Charts",
+      "summary": "This lesson teaches how to create scatter plots and bar charts using ggplot2, with a focus on customizing visual elements such as colors, axis labels, and titles to enhance clarity and scientific communication.",
+      "sections": [
+        {
+          "heading": "Scatter Plots with ggplot2",
+          "content": "Scatter plots are ideal for visualizing relationships between two continuous variables. In ggplot2, they are created using `geom_point()`, which maps data to visual properties (aesthetics). The x and y positions of points are determined by variables in the dataset. Customization includes adjusting point colors, sizes, and adding labels via `labs()`.",
+          "bullet_points": [
+            "Use `geom_point()` to create scatter plots",
+            "Map variables to x and y aesthetics",
+            "Customize colors with `color` or `fill` arguments"
+          ]
+        },
+        {
+          "heading": "Bar Charts with ggplot2",
+          "content": "Bar charts display categorical data using `geom_bar()` or `geom_col()`. `geom_bar()` automatically counts observations, while `geom_col()` requires precomputed values. Bars can be customized with colors, labels, and themes to improve readability and alignment with scientific standards.",
+          "bullet_points": [
+            "Use `geom_bar()` for counted data or `geom_col()` for precomputed values",
+            "Adjust bar colors with `fill` aesthetic",
+            "Add axis labels and titles using `labs()`"
+          ]
+        }
+      ],
+      "key_takeaways": [
+        "Scatter plots use `geom_point()` to show relationships between variables",
+        "Bar charts can be created with `geom_bar()` or `geom_col()` depending on data structure",
+        "Customization of colors, labels, and themes improves plot clarity",
+        "Understanding the difference between `geom_bar()` and `geom_col()` is critical for accurate visualization"
+      ],
+      "practical_activity": {
+        "title": "Creating and Customizing Scatter Plots and Bar Charts",
+        "instructions": [
+          "Load the `ggplot2` package and explore the built-in `mtcars` dataset",
+          "Create a scatter plot showing the relationship between `wt` (weight) and `mpg` (miles per gallon), customizing point color and adding axis labels",
+          "Generate a bar chart displaying the count of cars by `cyl` (number of cylinders), adjusting bar colors and adding a title"
+        ],
+        "expected_result": "Two plots: a scatter plot with customized aesthetics and a bar chart with labeled axes and a title",
+        "estimated_minutes": 15
+      },
+      "instructor_notes": [
+        "Remind learners to check data types before using `geom_bar()` (categorical vs. continuous variables)",
+        "Highlight the importance of clear axis labels for scientific reproducibility"
+      ],
+      "source_ids": [
+        "DOC-003"
+      ]
+    },
+    {
+      "lesson_id": "LES-004",
+      "title": "Histograms and Other Plot Types",
+      "summary": "This lesson introduces histograms, boxplots, and other common plot types in ggplot2, focusing on their use for exploring data distributions and patterns.",
+      "sections": [
+        {
+          "heading": "Histograms and Boxplots in ggplot2",
+          "content": "Histograms visualize the distribution of continuous variables by dividing data into bins and counting observations per bin. Boxplots summarize distributions using quartiles, medians, and outliers. Both are essential for exploratory data analysis.",
+          "bullet_points": [
+            "Histograms help identify skewness, modality, and outliers in data.",
+            "Boxplots are useful for comparing distributions across groups."
+          ]
+        },
+        {
+          "heading": "Creating Histograms",
+          "content": "In ggplot2, histograms are generated with `geom_histogram()`. The `x` aesthetic maps to the variable of interest, and `binwidth` controls the size of bins. The `fill` aesthetic can be used to differentiate groups.",
+          "bullet_points": [
+            "Use `coord_bin()` for logarithmic scaling if needed.",
+            "Adjust `bins` or `binwidth` to optimize visualization clarity."
+          ]
+        },
+        {
+          "heading": "Creating Boxplots",
+          "content": "Boxplots in ggplot2 are created with `geom_boxplot()`. The `x` aesthetic typically maps to a categorical variable, while `y` maps to a continuous variable. Outliers are automatically plotted as individual points.",
+          "bullet_points": [
+            "Use `position_dodge()` to compare boxplots across multiple groups.",
+            "Customize outlier visibility with `outlier.shape` and `outlier.size` parameters."
+          ]
+        },
+        {
+          "heading": "Interpreting Plot Outputs",
+          "content": "Effective interpretation involves identifying patterns (e.g., skewness in histograms, differences in medians in boxplots) and anomalies (e.g., extreme outliers). Always consider the context of the data and the research question.",
+          "bullet_points": []
+        }
+      ],
+      "key_takeaways": [
+        "Use `geom_histogram()` for visualizing continuous variable distributions.",
+        "Use `geom_boxplot()` for comparing group distributions and identifying outliers.",
+        "Customize plots to enhance clarity and align with scientific communication goals."
+      ],
+      "practical_activity": {
+        "title": "Exploring Data Distributions",
+        "instructions": [
+          "Load a dataset (e.g., `diamonds` from ggplot2) and create a histogram for the `price` variable. Experiment with different `binwidth` values.",
+          "Generate a boxplot comparing `price` across different `cut` categories. Add color to differentiate groups."
+        ],
+        "expected_result": "Produce a histogram showing price distribution and a boxplot comparing price by cut category, with clear customization and insights about the data.",
+        "estimated_minutes": 15
+      },
+      "instructor_notes": [
+        "Remind learners to adjust binwidth in histograms to avoid over-smoothing or under-smoothing data.",
+        "Highlight the importance of labeling axes and adding titles for clarity in scientific contexts."
+      ],
+      "source_ids": [
+        "DOC-004"
+      ]
+    },
+    {
+      "lesson_id": "LES-005",
+      "title": "Customizing Aesthetics and Themes",
+      "summary": "Learn to modify ggplot2 themes, adjust visual elements like colors and fonts, and add annotations to improve scientific communication through clear, professional visualizations.",
+      "sections": [
+        {
+          "heading": "Understanding Themes in ggplot2",
+          "content": "Themes in ggplot2 control the non-data aspects of a plot, such as background color, grid lines, and text formatting. The default theme is 'theme_grey', but you can apply pre-defined themes like 'theme_minimal()' or 'theme_classic()' to change the overall appearance. Themes ensure consistency across visualizations and can be further customized using the theme() function.",
+          "bullet_points": [
+            "Themes affect layout, colors, and typography",
+            "Pre-defined themes simplify styling",
+            "Use theme() for granular adjustments"
+          ]
+        },
+        {
+          "heading": "Customizing Individual Aesthetic Elements",
+          "content": "Adjust specific elements like titles, axis labels, and fonts using functions such as labs(), theme_text(), and scale_color_manual(). For example, labs() modifies axis titles and plot subtitles, while theme_text() controls font size and family. Color schemes can be tailored with scale_color_*() functions to match scientific publication standards.",
+          "bullet_points": [
+            "Use labs() for titles and axis labels",
+            "theme_text() adjusts font properties",
+            "scale_color_manual() defines custom color palettes"
+          ]
+        },
+        {
+          "heading": "Adding Annotations for Clarity",
+          "content": "Annotations enhance plots by adding context or highlighting key findings. Use geom_text() or geom_label() to add text directly to data points, and geom_segment() to draw arrows or lines. Annotations should be concise and avoid cluttering the plot, ensuring the primary data remains the focus.",
+          "bullet_points": []
+        }
+      ],
+      "key_takeaways": [
+        "Themes govern non-data visual elements, while aesthetics control data-related properties",
+        "Use labs() and theme() functions to modify titles, fonts, and layout",
+        "Annotations improve interpretability when used sparingly",
+        "Consistent styling is critical for scientific reproducibility"
+      ],
+      "practical_activity": {
+        "title": "Customizing a Plot Theme and Adding Annotations",
+        "instructions": [
+          "Load the 'diamonds' dataset from ggplot2 and create a scatter plot of price vs. carat, colored by cut",
+          "Apply 'theme_minimal()' and adjust the plot title, axis labels, and font size using labs() and theme_text()",
+          "Add a text annotation highlighting the highest-priced diamond using geom_text()",
+          "Modify the color palette to use a scientific color scheme (e.g., 'viridis')"
+        ],
+        "expected_result": "A scatter plot with a minimal theme, customized titles and fonts, a text annotation, and a color scheme suitable for scientific publishing",
+        "estimated_minutes": 15
+      },
+      "instructor_notes": [
+        "Remind learners to use theme() parameters like 'plot.title' and 'axis.title' for targeted adjustments",
+        "Emphasize that annotations should complement, not overwhelm, the data visualization"
+      ],
+      "source_ids": [
+        "DOC-005"
+      ]
+    },
+    {
+      "lesson_id": "LES-006",
+      "title": "Troubleshooting and Best Practices",
+      "summary": "This lesson focuses on resolving common ggplot2 errors and applying principles for clear scientific visualization, including debugging techniques, accessibility considerations, and reproducible practices.",
+      "sections": [
+        {
+          "heading": "Common Errors in ggplot2 and How to Resolve Them",
+          "content": "When working with ggplot2, errors often arise from mismatched data types, incorrect aesthetic mappings, or missing required layers. For example, using categorical variables on continuous scales or forgetting to include `aes()` when mapping variables are frequent issues. Learners should check console error messages, verify data structure with `str()`, and ensure all required layers (e.g., `geom_`) are included.",
+          "bullet_points": [
+            "Use `str(data)` to confirm variable types match plot requirements",
+            "Check for typos in column names within `aes()`",
+            "Ensure required geoms (e.g., `geom_point()`, `geom_bar()`) are properly included"
+          ]
+        },
+        {
+          "heading": "Best Practices for Effective Scientific Visualization",
+          "content": "Scientific plots should prioritize clarity, consistency, and accessibility. This includes using color palettes that are colorblind-friendly (e.g., `scale_color_viridis()`), avoiding excessive chart embellishments ('chartjunk'), and ensuring axis labels and titles are descriptive. Proper use of themes (`theme_minimal()`, `theme_classic()`) helps maintain focus on data.",
+          "bullet_points": [
+            "Use `labs()` for clear axis titles and plot captions",
+            "Apply consistent styling across multiple plots",
+            "Test plots with simulated color vision deficiencies using `viridis` scales"
+          ]
+        }
+      ],
+      "key_takeaways": [
+        "Debug ggplot2 errors by checking data structure, aesthetic mappings, and required layers",
+        "Prioritize clarity and accessibility in scientific visualizations",
+        "Use viridis color scales and minimal themes for reproducible, publication-ready plots"
+      ],
+      "practical_activity": {
+        "title": "Debugging and Refining a Plot",
+        "instructions": [
+          "Examine a provided ggplot2 code snippet containing intentional errors (e.g., mismatched data types, missing layers)",
+          "Correct the errors and apply best practices (e.g., improve labels, use accessible color scales)"
+        ],
+        "expected_result": "A functional plot with resolved errors, clear annotations, and professional styling using ggplot2 best practices",
+        "estimated_minutes": 15
+      },
+      "instructor_notes": [
+        "Emphasize the importance of reproducible code when demonstrating error resolution",
+        "Highlight how accessibility improvements (e.g., color choices) enhance scientific communication"
+      ],
+      "source_ids": [
+        "DOC-006"
+      ]
+    }
+  ]
+}

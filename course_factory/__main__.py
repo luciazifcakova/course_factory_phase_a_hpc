@@ -356,6 +356,8 @@ def main() -> None:
         return
     if args.command == "preflight":
         raise SystemExit(command_preflight(args))
+    if args.command == "create-course":
+        raise SystemExit(command_create_course(args))
     if args.command == "execute-r":
         raise SystemExit(command_execute_r(args))
     if args.command == "status":

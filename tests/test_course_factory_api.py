@@ -92,10 +92,86 @@ def responses():
                 }
             ]
         },
+        {
+            "lesson_id": "l1",
+            "title": "Grammar of graphics",
+            "summary": (
+                "This lesson introduces the layered grammar used by "
+                "ggplot2 to construct visualizations."
+            ),
+            "sections": [
+                {
+                    "heading": "Layers of a plot",
+                    "content": (
+                        "A ggplot2 graphic combines data, aesthetic "
+                        "mappings and geometric objects in explicit layers."
+                    ),
+                    "bullet_points": [
+                        "Data supplies observations.",
+                        "Aesthetics connect variables to visual properties.",
+                    ],
+                }
+            ],
+            "key_takeaways": [
+                "A ggplot2 plot is assembled from composable layers."
+            ],
+            "practical_activity": {
+                "title": "Identify plot components",
+                "instructions": [
+                    "Inspect a simple ggplot2 expression.",
+                    "Identify its data, mappings and geometry.",
+                ],
+                "expected_result": (
+                    "The learner correctly labels each plot component."
+                ),
+                "estimated_minutes": 15,
+            },
+            "instructor_notes": [
+                "Use a simple iris example during discussion."
+            ],
+            "source_ids": [],
+        },
+        {
+            "lesson_id": "l2",
+            "title": "Scatter plots",
+            "summary": (
+                "This lesson develops scatter plots and explains common "
+                "aesthetic mappings and customizations."
+            ),
+            "sections": [
+                {
+                    "heading": "Building a scatter plot",
+                    "content": (
+                        "Scatter plots display the relationship between "
+                        "two numeric variables using points."
+                    ),
+                    "bullet_points": [
+                        "Map numeric variables to x and y.",
+                        "Use colour carefully to represent groups.",
+                    ],
+                }
+            ],
+            "key_takeaways": [
+                "geom_point creates a scatter-plot layer."
+            ],
+            "practical_activity": {
+                "title": "Design a scatter plot",
+                "instructions": [
+                    "Choose two numeric variables from iris.",
+                    "Describe the mappings and expected visual pattern.",
+                ],
+                "expected_result": (
+                    "A clear plan for a labelled scatter plot."
+                ),
+                "estimated_minutes": 20,
+            },
+            "instructor_notes": [],
+            "source_ids": [],
+        },
     ]
 
 
-def test_api_creates_specification_and_outline(tmp_path):
+def test_api_creates_specification_outline_and_lessons(tmp_path):
     api = CourseFactoryAPI(
         settings=settings(tmp_path),
         backend=SequenceBackend(responses()),
@@ -111,25 +187,44 @@ def test_api_creates_specification_and_outline(tmp_path):
     )
 
     assert result.status == "completed"
-    assert result.current_step == "outline_complete"
-    assert len(result.artifacts) == 2
+    assert result.current_step == "lessons_complete"
+    assert len(result.artifacts) == 6
 
     job_dir = tmp_path / "workspace" / "jobs" / "job_test"
     assert (job_dir / "course_specification.json").is_file()
     assert (job_dir / "course_outline.json").is_file()
+    assert (job_dir / "lesson_content.json").is_file()
+    assert (job_dir / "lessons" / "README.md").is_file()
+    assert (
+        job_dir / "lessons" / "01_grammar-of-graphics.md"
+    ).is_file()
+    assert (
+        job_dir / "lessons" / "02_scatter-plots.md"
+    ).is_file()
+
+    lesson_text = (
+        job_dir / "lessons" / "01_grammar-of-graphics.md"
+    ).read_text(encoding="utf-8")
+    assert "# Grammar of graphics" in lesson_text
+    assert "## Practical activity" in lesson_text
+    assert "## Key takeaways" in lesson_text
 
     stored = api.get_job("job_test")
     assert stored["status"] == "completed"
     assert stored["state"]["course_outline"]["title"] == (
         "Introduction to ggplot2"
     )
+    assert len(stored["state"]["lesson_content"]["lessons"]) == 2
 
     event_messages = [
         event["message"]
         for event in api.get_events("job_test")
     ]
     assert "Course specification created." in event_messages
-    assert "Course outline created successfully." in event_messages
+    assert (
+        "Course specification, outline and Markdown lessons "
+        "created successfully."
+    ) in event_messages
 
 
 def test_api_accepts_plain_text_request(tmp_path):

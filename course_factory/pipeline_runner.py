@@ -10,6 +10,10 @@ from .course_response_models import (
     CreateCourseResponse,
 )
 from .input_builder_agent import InputBuilderAgent
+from .course_outline import CourseOutline
+from .lesson_content_models import LessonContentSet
+from .lesson_generation_agent import LessonGenerationAgent
+from .lesson_markdown_renderer import LessonMarkdownRenderer
 from .job_context import JobContext
 from .job_manager import JobManager
 from .llm_backend import LLMBackend
@@ -34,6 +38,7 @@ class PipelineRunner:
     ) -> None:
         self.backend = backend
         self.jobs = jobs
+        self.markdown_renderer = LessonMarkdownRenderer()
 
     @staticmethod
     def _write_json(
@@ -172,33 +177,88 @@ class PipelineRunner:
 
             self.jobs.transition(
                 job_id=job_id,
+                status="running",
+                step="lesson_generation",
+                patch={"course_outline": outline},
+                message=(
+                    "Course outline created; generating lesson content."
+                ),
+            )
+
+            lesson_result = LessonGenerationAgent(
+                self.backend
+            ).run(context)
+            if lesson_result.status is not AgentStatus.SUCCESS:
+                raise RuntimeError(
+                    "; ".join(lesson_result.errors)
+                    or "Lesson generation failed."
+                )
+
+            context = context.with_result(lesson_result)
+            lesson_content_raw = context.state["lesson_content"]
+            artifacts.append(
+                self._write_json(
+                    directory,
+                    "lesson_content.json",
+                    lesson_content_raw,
+                )
+            )
+
+            lesson_paths = self.markdown_renderer.export(
+                outline=CourseOutline.model_validate(outline),
+                content=LessonContentSet.model_validate(
+                    lesson_content_raw
+                ),
+                output_directory=directory / "lessons",
+            )
+            artifacts.extend(
+                CourseArtifact(
+                    name=(
+                        "lesson_index"
+                        if path.name == "README.md"
+                        else path.stem
+                    ),
+                    path=str(path),
+                    content_type="text/markdown",
+                )
+                for path in lesson_paths
+            )
+
+            artifact_payload = [
+                artifact.model_dump(mode="json")
+                for artifact in artifacts
+            ]
+            self.jobs.transition(
+                job_id=job_id,
                 status="completed",
-                step="outline_complete",
+                step="lessons_complete",
                 patch={
                     "course_specification": specification,
                     "course_outline": outline,
-                    "artifacts": [
-                        artifact.model_dump(mode="json")
-                        for artifact in artifacts
-                    ],
+                    "lesson_content": lesson_content_raw,
+                    "artifacts": artifact_payload,
                 },
-                message="Course outline created successfully.",
+                message=(
+                    "Course specification, outline and Markdown lessons "
+                    "created successfully."
+                ),
             )
 
             return CreateCourseResponse(
                 job_id=job_id,
                 status="completed",
-                current_step="outline_complete",
+                current_step="lessons_complete",
                 job_directory=str(directory),
                 artifacts=tuple(artifacts),
                 message=(
-                    "Course specification and outline were created. "
-                    "Slides, R scripts and PowerPoint are added in "
-                    "subsequent commits."
+                    "Course specification, outline and complete Markdown "
+                    "lesson files were created. Generated R scripts and "
+                    "PowerPoint are added in subsequent commits."
                 ),
                 metrics={
                     **input_result.metrics,
                     **planner_result.metrics,
+                    **lesson_result.metrics,
                 },
             )
 

@@ -1,0 +1,127 @@
+{
+  "title": "Introduction to Data Visualization with ggplot2",
+  "audience": "Scientists new to R visualization",
+  "language": "English",
+  "modules": [
+    {
+      "module_id": "MOD-01",
+      "title": "Understanding the Grammar of Graphics",
+      "description": "Introduce the foundational concepts of ggplot2's grammar of graphics framework.",
+      "lessons": [
+        {
+          "lesson_id": "LES-01",
+          "title": "Grammar of Graphics Basics",
+          "duration_minutes": 30,
+          "objectives": [
+            "Understand the core components of ggplot2 (data, aesthetics, geometry)"
+          ],
+          "practical": true,
+          "requires_live_demo": false,
+          "required_packages": [
+            "ggplot2"
+          ],
+          "prerequisites": [],
+          "knowledge_ids": []
+        }
+      ],
+      "prerequisites": []
+    },
+    {
+      "module_id": "MOD-02",
+      "title": "Creating Common Visualizations",
+      "description": "Learn to generate scatter plots, bar charts, and other common plot types using ggplot2.",
+      "lessons": [
+        {
+          "lesson_id": "LES-02",
+          "title": "Scatter Plots and Bar Charts",
+          "duration_minutes": 30,
+          "objectives": [
+            "Create scatter plots and bar charts with ggplot2"
+          ],
+          "practical": true,
+          "requires_live_demo": false,
+          "required_packages": [
+            "ggplot2"
+          ],
+          "prerequisites": [
+            "LES-01"
+          ],
+          "knowledge_ids": []
+        }
+      ],
+      "prerequisites": [
+        "MOD-01"
+      ]
+    },
+    {
+      "module_id": "MOD-03",
+      "title": "Customizing Aesthetics and Themes",
+      "description": "Explore customization options for plot appearance, including colors, labels, and themes.",
+      "lessons": [
+        {
+          "lesson_id": "LES-03",
+          "title": "Aesthetic and Theme Customization",
+          "duration_minutes": 30,
+          "objectives": [
+            "Modify plot aesthetics and apply custom themes"
+          ],
+          "practical": true,
+          "requires_live_demo": false,
+          "required_packages": [
+            "ggplot2"
+          ],
+          "prerequisites": [
+            "LES-02"
+          ],
+          "knowledge_ids": []
+        }
+      ],
+      "prerequisites": [
+        "MOD-02"
+      ]
+    },
+    {
+      "module_id": "MOD-04",
+      "title": "Troubleshooting and Interpretation",
+      "description": "Address common visualization issues and interpret plot outputs effectively.",
+      "lessons": [
+        {
+          "lesson_id": "LES-04",
+          "title": "Debugging and Interpretation",
+          "duration_minutes": 30,
+          "objectives": [
+            "Interpret and troubleshoot common visualization errors"
+          ],
+          "practical": true,
+          "requires_live_demo": false,
+          "required_packages": [
+            "ggplot2"
+          ],
+          "prerequisites": [
+            "LES-03"
+          ],
+          "knowledge_ids": []
+        }
+      ],
+      "prerequisites": [
+        "MOD-03"
+      ]
+    }
+  ],
+  "learning_objectives": [
+    "Understand the grammar of graphics framework in ggplot2",
+    "Create common visualization types (scatter plots, bar charts, etc.)",
+    "Customize plot aesthetics and themes",
+    "Interpret and troubleshoot common visualization issues"
+  ],
+  "required_packages": [
+    "ggplot2"
+  ],
+  "total_duration_minutes": 180,
+  "assumptions": [
+    "Participants have R installed and basic data analysis experience",
+    "Familiarity with tidyverse data structures (data frames)"
+  ],
+  "references": [],
+  "version": "1.0"
+}
