@@ -258,21 +258,39 @@ class PipelineRunner:
             r_result = RCodeGenerationAgent(
                 self.backend,
                 output_dir=directory / "scripts",
+                trace_dir=(
+                    directory
+                    / "llm"
+                    / "r_code_generation"
+                ),
+                max_attempts=3,
             ).run(context)
+
+            # Persist diagnostics even when the generation agent encounters
+            # task-level failures. This makes failed local-model responses
+            # inspectable from the job directory.
+            generation_report = r_result.outputs.get(
+                "r_code_generation_report"
+            )
+            if isinstance(generation_report, dict):
+                artifacts.append(
+                    self._write_json(
+                        directory,
+                        "r_code_generation_report.json",
+                        generation_report,
+                    )
+                )
+
             if r_result.status is not AgentStatus.SUCCESS:
                 raise RuntimeError(
                     "; ".join(r_result.errors)
                     or "R code generation failed."
                 )
+
             context = context.with_result(r_result)
-            generation_report = context.state["r_code_generation_report"]
-            artifacts.append(
-                self._write_json(
-                    directory,
-                    "r_code_generation_report.json",
-                    generation_report,
-                )
-            )
+            generation_report = context.state[
+                "r_code_generation_report"
+            ]
 
             if generation_report.get("failed_task_ids"):
                 raise RuntimeError(
