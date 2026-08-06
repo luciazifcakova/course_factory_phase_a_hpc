@@ -28,3 +28,9 @@ and records per-node execution duration.
 python -m pip install -e ".[dev]"
 pytest
 ```
+
+## Commit 0003
+
+`create-course` now also creates a workflow plan and security-approved R
+teaching scripts. The scripts are generated but are not executed until the
+next commit.
