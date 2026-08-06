@@ -56,6 +56,7 @@ class PipelineRunner:
             or CourseExecutionService(
                 settings=settings,
                 workspace=jobs.workspace,
+                backend=backend,
             )
         )
 
@@ -437,6 +438,12 @@ class PipelineRunner:
                     ),
                     "execution_output_count": (
                         execution_report_model.output_count
+                    ),
+                    "execution_repair_attempts": (
+                        execution_report_model.repair_attempt_count
+                    ),
+                    "repaired_r_scripts": len(
+                        execution_report_model.repaired_task_ids
                     ),
                 }
 

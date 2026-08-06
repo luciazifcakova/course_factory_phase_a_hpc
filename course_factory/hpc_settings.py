@@ -33,6 +33,7 @@ class HPCSettings:
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen3:14b"
     ollama_timeout_seconds: int = 900
+    r_execution_repair_attempts: int = 2
 
     @classmethod
     def from_environment(cls) -> "HPCSettings":
@@ -91,6 +92,12 @@ class HPCSettings:
                 os.getenv(
                     "OLLAMA_TIMEOUT_SECONDS",
                     "900",
+                )
+            ),
+            r_execution_repair_attempts=int(
+                os.getenv(
+                    "R_EXECUTION_REPAIR_ATTEMPTS",
+                    "2",
                 )
             ),
         )
