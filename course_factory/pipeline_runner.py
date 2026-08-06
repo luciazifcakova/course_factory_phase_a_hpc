@@ -4,7 +4,10 @@ import json
 from pathlib import Path
 
 from .course_planner_agent import CoursePlannerAgent
-from .course_request_models import CreateCourseRequest
+from .course_request_models import (
+    CourseExecutor,
+    CreateCourseRequest,
+)
 from .course_response_models import (
     CourseArtifact,
     CreateCourseResponse,
@@ -17,6 +20,9 @@ from .lesson_markdown_renderer import LessonMarkdownRenderer
 from .r_workflow_planner_agent import RWorkflowPlannerAgent
 from .r_code_generation_agent import RCodeGenerationAgent
 from .security_validator_agent import SecurityValidatorAgent
+from .course_execution_service import CourseExecutionService
+from .hpc_settings import HPCSettings
+from .r_code_models import RScriptArtifact
 from .job_context import JobContext
 from .job_manager import JobManager
 from .llm_backend import LLMBackend
@@ -38,10 +44,20 @@ class PipelineRunner:
         *,
         backend: LLMBackend,
         jobs: JobManager,
+        settings: HPCSettings,
+        execution_service: CourseExecutionService | None = None,
     ) -> None:
         self.backend = backend
         self.jobs = jobs
+        self.settings = settings
         self.markdown_renderer = LessonMarkdownRenderer()
+        self.execution_service = (
+            execution_service
+            or CourseExecutionService(
+                settings=settings,
+                workspace=jobs.workspace,
+            )
+        )
 
     @staticmethod
     def _write_json(
@@ -339,39 +355,164 @@ class PipelineRunner:
                     )
                 )
 
+            execution_report = None
+            execution_metrics = {}
+
+            if request.executor is not CourseExecutor.NONE:
+                self.jobs.transition(
+                    job_id=job_id,
+                    status="running",
+                    step="r_execution",
+                    patch={
+                        "executor": request.executor.value,
+                    },
+                    message=(
+                        "Executing approved R scripts through "
+                        "Apptainer using "
+                        f"{request.executor.value}."
+                    ),
+                )
+
+                approved_scripts = tuple(
+                    RScriptArtifact.model_validate(script)
+                    for script
+                    in context.state["approved_r_scripts"]
+                )
+                execution_report_model = (
+                    self.execution_service.execute(
+                        job_id=job_id,
+                        scripts=approved_scripts,
+                        request=request,
+                    )
+                )
+                execution_report = (
+                    execution_report_model.model_dump(
+                        mode="json"
+                    )
+                )
+                artifacts.append(
+                    self._write_json(
+                        directory,
+                        "execution_report.json",
+                        execution_report,
+                    )
+                )
+
+                for result in execution_report_model.results:
+                    for output in result.outputs:
+                        suffix = Path(
+                            output.relative_path
+                        ).suffix.lower()
+                        content_type = {
+                            ".png": "image/png",
+                            ".jpg": "image/jpeg",
+                            ".jpeg": "image/jpeg",
+                            ".csv": "text/csv",
+                            ".tsv": "text/tab-separated-values",
+                            ".json": "application/json",
+                        }.get(
+                            suffix,
+                            "application/octet-stream",
+                        )
+                        artifacts.append(
+                            CourseArtifact(
+                                name=(
+                                    f"{result.lesson_id}_"
+                                    f"{Path(output.relative_path).stem}"
+                                ),
+                                path=output.absolute_path,
+                                content_type=content_type,
+                            )
+                        )
+
+                execution_metrics = {
+                    "executed_r_scripts": len(
+                        execution_report_model.results
+                    ),
+                    "successful_r_scripts": len(
+                        execution_report_model.successful_task_ids
+                    ),
+                    "failed_r_scripts": len(
+                        execution_report_model.failed_task_ids
+                    ),
+                    "execution_output_count": (
+                        execution_report_model.output_count
+                    ),
+                }
+
+                if not execution_report_model.succeeded:
+                    details = []
+                    for result in (
+                        execution_report_model.results
+                    ):
+                        if result.succeeded:
+                            continue
+                        details.append(
+                            f"{result.task_id}: "
+                            f"exit="
+                            f"{result.runtime_result.return_code}, "
+                            f"missing="
+                            f"{list(result.expected_outputs_missing)!r}"
+                        )
+                    raise RuntimeError(
+                        "R execution failed: "
+                        + "; ".join(details)
+                    )
+
+            final_step = (
+                "r_execution_complete"
+                if execution_report is not None
+                else "r_scripts_complete"
+            )
             artifact_payload = [
                 artifact.model_dump(mode="json")
                 for artifact in artifacts
             ]
+            state_patch = {
+                "course_specification": specification,
+                "course_outline": outline,
+                "lesson_content": lesson_content_raw,
+                "workflow_plan": workflow_plan,
+                "r_code_generation_report": generation_report,
+                "security_report": security_report,
+                "approved_r_scripts": (
+                    context.state["approved_r_scripts"]
+                ),
+                "artifacts": artifact_payload,
+            }
+            if execution_report is not None:
+                state_patch[
+                    "execution_report"
+                ] = execution_report
+
             self.jobs.transition(
                 job_id=job_id,
                 status="completed",
-                step="r_scripts_complete",
-                patch={
-                    "course_specification": specification,
-                    "course_outline": outline,
-                    "lesson_content": lesson_content_raw,
-                    "workflow_plan": workflow_plan,
-                    "r_code_generation_report": generation_report,
-                    "security_report": security_report,
-                    "approved_r_scripts": context.state["approved_r_scripts"],
-                    "artifacts": artifact_payload,
-                },
+                step=final_step,
+                patch=state_patch,
                 message=(
-                    "Course lessons and security-approved R scripts created successfully."
+                    "Course lessons, approved R scripts and "
+                    "execution artifacts created successfully."
+                    if execution_report is not None
+                    else "Course lessons and security-approved "
+                    "R scripts created successfully."
                 ),
             )
 
             return CreateCourseResponse(
                 job_id=job_id,
                 status="completed",
-                current_step="r_scripts_complete",
+                current_step=final_step,
                 job_directory=str(directory),
                 artifacts=tuple(artifacts),
                 message=(
-                    "Course specification, outline, Markdown lessons and "
-                    "security-approved R teaching scripts were created. "
-                    "Script execution and PowerPoint are added in subsequent commits."
+                    "Course specification, outline, Markdown "
+                    "lessons, R scripts and executed outputs "
+                    "were created."
+                    if execution_report is not None
+                    else "Course specification, outline, "
+                    "Markdown lessons and security-approved "
+                    "R teaching scripts were created."
                 ),
                 metrics={
                     **input_result.metrics,
@@ -380,6 +521,7 @@ class PipelineRunner:
                     **workflow_result.metrics,
                     **r_result.metrics,
                     **security_result.metrics,
+                    **execution_metrics,
                 },
             )
 

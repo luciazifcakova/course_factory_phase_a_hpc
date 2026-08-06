@@ -1,3 +1,10 @@
+from .course_execution_models import (
+    CourseExecutionReport,
+    CourseScriptExecution,
+    ExecutedOutput,
+)
+from .course_execution_service import CourseExecutionService
+from .course_request_models import CourseExecutor
 from .r_code_models import (
     RCodeGenerationAttempt,
     RCodeLLMResponse,

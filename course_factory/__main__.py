@@ -11,7 +11,10 @@ import yaml
 
 from .api import CourseFactoryAPI
 from .apptainer_tasks import build_apptainer_r_task
-from .course_request_models import CreateCourseRequest
+from .course_request_models import (
+    CourseExecutor,
+    CreateCourseRequest,
+)
 from .environment_preflight import run_environment_preflight
 from .hpc_settings import settings
 from .job_store import SQLiteJobStore
@@ -249,6 +252,13 @@ def command_create_course(args) -> int:
                 required_packages=_parse_packages(
                     args.r_packages
                 ),
+                executor=CourseExecutor(
+                    args.executor
+                ),
+                execution_cpus=args.cpus,
+                execution_memory_gb=args.memory_gb,
+                execution_time_minutes=args.time_minutes,
+                execution_partition=args.partition,
             ),
             job_id=args.job_id,
         )
@@ -321,6 +331,19 @@ def main() -> None:
         default="",
         help="Comma-separated required R packages.",
     )
+    create_course.add_argument(
+        "--executor",
+        choices=("none", "local", "slurm"),
+        default="none",
+        help=(
+            "Execute generated R scripts through Apptainer "
+            "locally or through SLURM."
+        ),
+    )
+    create_course.add_argument("--cpus", type=int)
+    create_course.add_argument("--memory-gb", type=int)
+    create_course.add_argument("--time-minutes", type=int)
+    create_course.add_argument("--partition")
 
     execute_r = commands.add_parser(
         "execute-r",

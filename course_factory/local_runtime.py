@@ -19,33 +19,50 @@ class LocalRuntimeBackend(RuntimeBackend):
         environment.update(task.environment)
 
         started = time.perf_counter()
-        process = subprocess.run(
-            list(task.command),
-            cwd=workdir,
-            capture_output=True,
-            text=True,
-            env=environment,
-            check=False,
-        )
+        try:
+            process = subprocess.run(
+                list(task.command),
+                cwd=workdir,
+                capture_output=True,
+                text=True,
+                env=environment,
+                check=False,
+                timeout=task.timeout_seconds,
+            )
+            return_code = process.returncode
+            stdout = process.stdout
+            stderr = process.stderr
+        except subprocess.TimeoutExpired as exc:
+            return_code = 124
+            stdout = exc.stdout or ""
+            stderr = exc.stderr or ""
+            if isinstance(stdout, bytes):
+                stdout = stdout.decode(errors="replace")
+            if isinstance(stderr, bytes):
+                stderr = stderr.decode(errors="replace")
+            stderr = (
+                stderr + "\nLocal execution timed out."
+            ).strip()
+
         duration = time.perf_counter() - started
 
         if task.stdout_path:
             Path(task.stdout_path).write_text(
-                process.stdout,
+                stdout,
                 encoding="utf-8",
             )
         if task.stderr_path:
             Path(task.stderr_path).write_text(
-                process.stderr,
+                stderr,
                 encoding="utf-8",
             )
 
         return RuntimeResult(
             task_id=task.task_id,
             runtime=RuntimeKind.LOCAL,
-            return_code=process.returncode,
-            stdout=process.stdout,
-            stderr=process.stderr,
+            return_code=return_code,
+            stdout=stdout,
+            stderr=stderr,
             submitted=True,
             completed=True,
             duration_seconds=duration,

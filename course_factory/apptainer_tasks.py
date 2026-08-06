@@ -16,6 +16,7 @@ def build_apptainer_r_task(
     image: str | Path,
     runtime: RuntimeKind,
     resources: ResourceRequest,
+    timeout_seconds: int = 1800,
 ) -> RuntimeTask:
     task_directory = Path(task_directory).resolve()
     image = Path(image).expanduser().resolve()
@@ -57,4 +58,5 @@ def build_apptainer_r_task(
         stderr_path=str(
             task_directory / "logs" / "stderr.log"
         ),
+        timeout_seconds=timeout_seconds,
     )

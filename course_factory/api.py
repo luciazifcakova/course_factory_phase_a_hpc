@@ -40,6 +40,7 @@ class CourseFactoryAPI:
         self.runner = PipelineRunner(
             backend=self.backend,
             jobs=self.jobs,
+            settings=settings,
         )
 
     def create_course(

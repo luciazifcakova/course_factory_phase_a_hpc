@@ -30,6 +30,11 @@ class RuntimeTask(BaseModel):
     runtime: RuntimeKind = RuntimeKind.LOCAL
     stdout_path: str | None = None
     stderr_path: str | None = None
+    timeout_seconds: int = Field(
+        default=1800,
+        ge=1,
+        le=86400,
+    )
 
 
 class RuntimeResult(BaseModel):

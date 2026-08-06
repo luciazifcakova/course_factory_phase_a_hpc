@@ -1,6 +1,14 @@
 from __future__ import annotations
 
+from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class CourseExecutor(StrEnum):
+    NONE = "none"
+    LOCAL = "local"
+    SLURM = "slurm"
 
 
 class CreateCourseRequest(BaseModel):
@@ -17,6 +25,15 @@ class CreateCourseRequest(BaseModel):
     language: str | None = None
     level: str | None = None
     required_packages: tuple[str, ...] = ()
+    executor: CourseExecutor = CourseExecutor.NONE
+    execution_cpus: int | None = Field(default=None, ge=1, le=256)
+    execution_memory_gb: int | None = Field(default=None, ge=1, le=2048)
+    execution_time_minutes: int | None = Field(
+        default=None,
+        ge=1,
+        le=10080,
+    )
+    execution_partition: str | None = None
     output_formats: tuple[str, ...] = (
         "course_specification",
         "course_outline",
@@ -50,6 +67,11 @@ class CreateCourseRequest(BaseModel):
             details.append(f"Language: {self.language}")
         if self.level:
             details.append(f"Level: {self.level}")
+        if self.executor is not CourseExecutor.NONE:
+            details.append(
+                "Execute generated R scripts using: "
+                f"{self.executor.value}"
+            )
         if self.required_packages:
             details.append(
                 "Required R packages: "
