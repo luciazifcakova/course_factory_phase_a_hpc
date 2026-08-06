@@ -1,3 +1,11 @@
+from .api import CourseFactoryAPI
+from .course_request_models import CreateCourseRequest
+from .course_response_models import (
+    CourseArtifact,
+    CreateCourseResponse,
+)
+from .job_manager import JobManager
+from .pipeline_runner import PipelineRunner
 from .apptainer_tasks import build_apptainer_r_task
 from .environment_preflight import run_environment_preflight
 from .hpc_settings import HPCSettings

@@ -9,7 +9,9 @@ from uuid import uuid4
 
 import yaml
 
+from .api import CourseFactoryAPI
 from .apptainer_tasks import build_apptainer_r_task
+from .course_request_models import CreateCourseRequest
 from .environment_preflight import run_environment_preflight
 from .hpc_settings import settings
 from .job_store import SQLiteJobStore
@@ -226,6 +228,40 @@ def command_execute_r(args) -> int:
     return 0 if result.succeeded else 1
 
 
+
+def command_create_course(args) -> int:
+    initialize_workspace()
+    api = CourseFactoryAPI(settings=settings)
+
+    if args.request_file:
+        response = api.create_course_from_yaml(
+            args.request_file,
+            job_id=args.job_id,
+        )
+    else:
+        response = api.create_course(
+            CreateCourseRequest(
+                prompt=args.prompt,
+                duration_minutes=args.duration_minutes,
+                audience=args.audience,
+                language=args.language,
+                level=args.level,
+                required_packages=_parse_packages(
+                    args.r_packages
+                ),
+            ),
+            job_id=args.job_id,
+        )
+
+    print(
+        response.model_dump_json(
+            indent=2,
+        )
+    )
+    return 0 if response.status == "completed" else 1
+
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="course-factory"
@@ -253,6 +289,37 @@ def main() -> None:
         "--slurm",
         action="store_true",
         help="Require sbatch, squeue and scancel.",
+    )
+
+
+    create_course = commands.add_parser(
+        "create-course",
+        help=(
+            "Create a normalized course specification and course outline "
+            "from a natural-language request or YAML file."
+        ),
+    )
+    request_group = create_course.add_mutually_exclusive_group(
+        required=True
+    )
+    request_group.add_argument(
+        "--prompt",
+        help='For example: "Create an introduction to ggplot2 course"',
+    )
+    request_group.add_argument(
+        "--request-file",
+        type=Path,
+        help="YAML file containing the course request.",
+    )
+    create_course.add_argument("--job-id")
+    create_course.add_argument("--duration-minutes", type=int)
+    create_course.add_argument("--audience")
+    create_course.add_argument("--language")
+    create_course.add_argument("--level")
+    create_course.add_argument(
+        "--r-packages",
+        default="",
+        help="Comma-separated required R packages.",
     )
 
     execute_r = commands.add_parser(

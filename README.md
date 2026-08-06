@@ -28,4 +28,3 @@ and records per-node execution duration.
 python -m pip install -e ".[dev]"
 pytest
 ```
-# course_factory_phase_a_hpc
