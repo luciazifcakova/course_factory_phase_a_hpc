@@ -177,7 +177,13 @@ class PipelineRunner:
             context = context.model_copy(update={"state": state})
 
             planner_result = CoursePlannerAgent(
-                self.backend
+                self.backend,
+                trace_dir=(
+                    directory
+                    / "llm"
+                    / "course_planner"
+                ),
+                max_attempts=3,
             ).run(context)
             if planner_result.status is not AgentStatus.SUCCESS:
                 raise RuntimeError(
