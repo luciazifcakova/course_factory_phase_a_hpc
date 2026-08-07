@@ -40,7 +40,29 @@ class AgentResult(BaseModel):
                    started_at=now,finished_at=now,attempt=attempt)
 
     @classmethod
-    def failed(cls, *, agent_name, errors, attempt=1):
+    def failed(
+        cls,
+        *,
+        agent_name,
+        errors,
+        outputs=None,
+        metrics=None,
+        attempt=1,
+    ):
+        """
+        Build a failed AgentResult while preserving optional diagnostic
+        outputs/metrics. Failed agents may need to expose bounded attempt
+        traces or validation metadata to the pipeline without pretending
+        that the agent succeeded.
+        """
         now=datetime.now(timezone.utc)
-        return cls(agent_name=agent_name,status=AgentStatus.FAILED,errors=errors,
-                   started_at=now,finished_at=now,attempt=attempt)
+        return cls(
+            agent_name=agent_name,
+            status=AgentStatus.FAILED,
+            outputs=outputs or {},
+            errors=errors,
+            metrics=metrics or {},
+            started_at=now,
+            finished_at=now,
+            attempt=attempt,
+        )

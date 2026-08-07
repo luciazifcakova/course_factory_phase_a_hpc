@@ -426,24 +426,32 @@ class SlidePlannerAgent(Agent):
             )
 
         except Exception as exc:
+            failure_outputs = {
+                "slide_planning_attempts": [
+                    item.model_dump(mode="json")
+                    for item in (
+                        attempts
+                        if "attempts" in locals()
+                        else []
+                    )
+                ]
+            }
+            self._write_json(
+                self.trace_dir / "slide_planning_failure.json",
+                {
+                    "agent": self.name,
+                    "error": (
+                        f"{type(exc).__name__}: {exc}"
+                    ),
+                    **failure_outputs,
+                },
+            )
             return AgentResult.failed(
                 agent_name=self.name,
                 errors=(
                     f"{type(exc).__name__}: {exc}",
                 ),
-                outputs={
-                    "slide_planning_attempts": [
-                        item.model_dump(
-                            mode="json"
-                        )
-                        for item in (
-                            attempts
-                            if "attempts"
-                            in locals()
-                            else []
-                        )
-                    ]
-                },
+                outputs=failure_outputs,
             )
 
         return AgentResult.success(
