@@ -193,6 +193,15 @@ class PipelineRunner:
 
             context = context.with_result(planner_result)
             outline = context.state["course_outline"]
+
+            if not any(
+                module["lessons"]
+                for module in outline["modules"]
+            ):
+                raise RuntimeError(
+                    "Planner produced no lessons; refusing to continue "
+                    "with an empty course."
+                )
             artifacts.append(
                 self._write_json(
                     directory,
@@ -476,6 +485,16 @@ class PipelineRunner:
                     raise RuntimeError(
                         "R execution failed: "
                         + "; ".join(details)
+                    )
+
+            if execution_report is not None:
+                if (
+                    not execution_report.get("results")
+                    or not execution_report.get("successful_task_ids")
+                ):
+                    raise RuntimeError(
+                        "Execution produced no successful R tasks; "
+                        "refusing to mark an empty course completed."
                     )
 
             final_step = (

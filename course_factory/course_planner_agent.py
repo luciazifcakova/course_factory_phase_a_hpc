@@ -15,11 +15,7 @@ from pydantic import (
 
 from .agent import Agent
 from .agent_result import AgentResult
-from .course_outline import (
-    CourseModule,
-    CourseOutline,
-    Lesson,
-)
+from .course_outline import CourseModule, CourseOutline, Lesson
 from .course_specification import CourseSpecification
 from .job_context import JobContext
 from .lesson_scheduler import LessonScheduler
@@ -35,6 +31,7 @@ DependencyId = Annotated[
     StringConstraints(
         strip_whitespace=True,
         min_length=1,
+        max_length=32,
         pattern=r"^[A-Za-z][A-Za-z0-9_.-]*$",
     ),
 ]
@@ -48,30 +45,28 @@ class PlannerLesson(BaseModel):
     )
 
     lesson_id: DependencyId
-    title: str = Field(min_length=2)
-    duration_minutes: int = Field(ge=5, le=240)
-    objectives: tuple[str, ...] = ()
+    title: str = Field(min_length=2, max_length=120)
+    duration_minutes: int = Field(ge=5, le=180)
+    objectives: tuple[str, ...] = Field(default=(), max_length=6)
     practical: bool = False
     requires_live_demo: bool = False
-    required_packages: tuple[str, ...] = ()
-
+    required_packages: tuple[str, ...] = Field(default=(), max_length=8)
     prerequisite_lesson_ids: tuple[
         DependencyId,
         ...,
     ] = Field(
         default=(),
+        max_length=4,
         validation_alias=AliasChoices(
             "prerequisite_lesson_ids",
             "prerequisites",
         ),
         serialization_alias="prerequisite_lesson_ids",
         description=(
-            "IDs of lessons in this same course that must be "
-            "completed first. Never put background knowledge here."
+            "IDs of EARLIER lessons in this same returned course plan."
         ),
     )
-
-    knowledge_ids: tuple[str, ...] = ()
+    knowledge_ids: tuple[str, ...] = Field(default=(), max_length=20)
 
 
 class PlannerModule(BaseModel):
@@ -82,69 +77,75 @@ class PlannerModule(BaseModel):
     )
 
     module_id: DependencyId
-    title: str = Field(min_length=2)
-    description: str = ""
-    lessons: tuple[PlannerLesson, ...] = ()
-
+    title: str = Field(min_length=2, max_length=120)
+    description: str = Field(default="", max_length=500)
+    lessons: tuple[PlannerLesson, ...] = Field(
+        min_length=1,
+        max_length=8,
+    )
     prerequisite_module_ids: tuple[
         DependencyId,
         ...,
     ] = Field(
         default=(),
+        max_length=4,
         validation_alias=AliasChoices(
             "prerequisite_module_ids",
             "prerequisites",
         ),
         serialization_alias="prerequisite_module_ids",
         description=(
-            "IDs of modules in this same course that must be "
-            "completed first. Never put human-readable background "
-            "knowledge here."
+            "IDs of EARLIER modules in this same returned course plan."
         ),
     )
 
 
 class PlannerResponse(BaseModel):
-    model_config = ConfigDict(
-        extra="forbid",
-        frozen=True,
-    )
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
-    modules: tuple[PlannerModule, ...]
+    modules: tuple[PlannerModule, ...] = Field(
+        min_length=1,
+        max_length=8,
+    )
 
     @model_validator(mode="after")
     def validate_dependency_references(
         self,
     ) -> "PlannerResponse":
-        module_ids = [
-            module.module_id
-            for module in self.modules
-        ]
+        module_ids = [m.module_id for m in self.modules]
         if len(module_ids) != len(set(module_ids)):
-            raise ValueError(
-                "module_id values must be unique"
-            )
+            raise ValueError("module_id values must be unique")
 
-        module_id_set = set(module_ids)
+        module_set = set(module_ids)
+        module_index = {
+            module_id: index
+            for index, module_id in enumerate(module_ids)
+        }
+
         for module in self.modules:
-            if (
-                module.module_id
-                in module.prerequisite_module_ids
-            ):
+            if module.module_id in module.prerequisite_module_ids:
                 raise ValueError(
-                    f"module {module.module_id!r} cannot depend "
-                    "on itself"
+                    f"module {module.module_id!r} cannot depend on itself"
                 )
-
             unknown = (
-                set(module.prerequisite_module_ids)
-                - module_id_set
+                set(module.prerequisite_module_ids) - module_set
             )
             if unknown:
                 raise ValueError(
-                    f"module {module.module_id!r} references "
-                    "unknown prerequisite module IDs: "
+                    f"module {module.module_id!r} references unknown "
+                    "prerequisite module IDs: "
                     + ", ".join(sorted(unknown))
+                )
+            forward = [
+                dep
+                for dep in module.prerequisite_module_ids
+                if module_index[dep] >= module_index[module.module_id]
+            ]
+            if forward:
+                raise ValueError(
+                    f"module {module.module_id!r} may depend only on "
+                    "earlier modules; invalid: "
+                    + ", ".join(sorted(forward))
                 )
 
         lessons = [
@@ -152,35 +153,51 @@ class PlannerResponse(BaseModel):
             for module in self.modules
             for lesson in module.lessons
         ]
-        lesson_ids = [
-            lesson.lesson_id
-            for lesson in lessons
-        ]
+        if not lessons:
+            raise ValueError(
+                "course plan must contain at least one lesson"
+            )
+        if len(lessons) > 24:
+            raise ValueError(
+                "course plan contains too many lessons"
+            )
+
+        lesson_ids = [lesson.lesson_id for lesson in lessons]
         if len(lesson_ids) != len(set(lesson_ids)):
             raise ValueError(
                 "lesson_id values must be globally unique"
             )
 
-        lesson_id_set = set(lesson_ids)
-        for lesson in lessons:
-            if (
-                lesson.lesson_id
-                in lesson.prerequisite_lesson_ids
-            ):
-                raise ValueError(
-                    f"lesson {lesson.lesson_id!r} cannot depend "
-                    "on itself"
-                )
+        lesson_set = set(lesson_ids)
+        lesson_index = {
+            lesson_id: index
+            for index, lesson_id in enumerate(lesson_ids)
+        }
 
+        for lesson in lessons:
+            if lesson.lesson_id in lesson.prerequisite_lesson_ids:
+                raise ValueError(
+                    f"lesson {lesson.lesson_id!r} cannot depend on itself"
+                )
             unknown = (
-                set(lesson.prerequisite_lesson_ids)
-                - lesson_id_set
+                set(lesson.prerequisite_lesson_ids) - lesson_set
             )
             if unknown:
                 raise ValueError(
-                    f"lesson {lesson.lesson_id!r} references "
-                    "unknown prerequisite lesson IDs: "
+                    f"lesson {lesson.lesson_id!r} references unknown "
+                    "prerequisite lesson IDs: "
                     + ", ".join(sorted(unknown))
+                )
+            forward = [
+                dep
+                for dep in lesson.prerequisite_lesson_ids
+                if lesson_index[dep] >= lesson_index[lesson.lesson_id]
+            ]
+            if forward:
+                raise ValueError(
+                    f"lesson {lesson.lesson_id!r} may depend only on "
+                    "earlier lessons; invalid: "
+                    + ", ".join(sorted(forward))
                 )
 
         return self
@@ -188,7 +205,7 @@ class PlannerResponse(BaseModel):
 
 class CoursePlannerAgent(Agent):
     name = "course_planner"
-    version = "1.2.0"
+    version = "1.3.0"
     capabilities = frozenset({"course_planning"})
 
     def __init__(
@@ -200,29 +217,15 @@ class CoursePlannerAgent(Agent):
         max_attempts: int = 3,
     ) -> None:
         if max_attempts < 1:
-            raise ValueError(
-                "max_attempts must be at least one"
-            )
-        self.backend = ensure_structured_backend(
-            backend
-        )
+            raise ValueError("max_attempts must be at least one")
+        self.backend = ensure_structured_backend(backend)
         self.scheduler = scheduler or LessonScheduler()
-        self.trace_dir = (
-            Path(trace_dir)
-            if trace_dir is not None
-            else None
-        )
+        self.trace_dir = Path(trace_dir) if trace_dir else None
         self.max_attempts = max_attempts
 
     @staticmethod
-    def _write_json(
-        path: Path,
-        payload,
-    ) -> None:
-        path.parent.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
+    def _write_json(path: Path, payload) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps(
                 payload,
@@ -236,22 +239,19 @@ class CoursePlannerAgent(Agent):
     @staticmethod
     def _system_prompt() -> str:
         return (
-            "You are an expert R instructor. Build a concise, "
-            "pedagogically ordered course plan. Return data that "
-            "conforms exactly to the supplied JSON schema. "
-            "IMPORTANT: course/background prerequisites such as "
-            "'basic R programming knowledge' belong only to the "
-            "course specification and MUST NOT appear in module or "
-            "lesson dependency fields. "
-            "prerequisite_module_ids may contain ONLY module_id "
-            "values that occur in this returned plan. "
-            "prerequisite_lesson_ids may contain ONLY lesson_id "
-            "values that occur in this returned plan. "
-            "If the first module has no in-course dependency, use "
-            "an empty prerequisite_module_ids array. "
-            "Use short machine-readable IDs without spaces, for "
-            "example mod_001 and LES-001. Preserve supplied "
-            "knowledge IDs. Do not exceed the requested duration."
+            "You are an expert R instructor. Build a compact, "
+            "pedagogically ordered course plan that conforms exactly "
+            "to the supplied JSON schema. Every module MUST contain at "
+            "least one lesson. For a course around 180 minutes, normally "
+            "create 1-4 modules and 3-6 lessons total. Do not create "
+            "dozens of modules or hundreds/thousands of IDs. "
+            "Course/background prerequisites belong only to the course "
+            "specification and MUST NOT appear in graph dependency IDs. "
+            "prerequisite_module_ids may contain only EARLIER module IDs "
+            "from this returned plan. prerequisite_lesson_ids may contain "
+            "only EARLIER lesson IDs. Use at most four dependency IDs per "
+            "item. The sum of lesson durations should closely match the "
+            "requested duration. Use short IDs such as mod_001 and LES-001."
         )
 
     @staticmethod
@@ -263,11 +263,11 @@ class CoursePlannerAgent(Agent):
         return (
             "COURSE SPECIFICATION:\n"
             f"{spec.model_dump_json(indent=2)}\n\n"
-            "BACKGROUND PREREQUISITES (these are NOT module "
-            "dependency IDs):\n"
+            "BACKGROUND PREREQUISITES (NOT graph IDs):\n"
             f"{list(spec.prerequisites)!r}\n\n"
             "LOCAL KNOWLEDGE:\n"
-            f"{local_knowledge}"
+            f"{local_knowledge}\n\n"
+            f"REQUESTED DURATION: {spec.duration_minutes} minutes"
         )
 
     @staticmethod
@@ -277,26 +277,30 @@ class CoursePlannerAgent(Agent):
         error: str,
         previous_response,
     ) -> str:
+        preview = json.dumps(
+            previous_response,
+            ensure_ascii=False,
+            default=str,
+        )
+        if len(preview) > 2000:
+            preview = preview[:2000] + "...[previous response truncated]"
+
         return (
             original_user
-            + "\n\nThe previous course plan was invalid. Return "
-            "the COMPLETE corrected course-plan JSON again.\n\n"
-            "ERROR:\n"
+            + "\n\nThe previous plan was invalid. Generate a FRESH "
+            "COMPLETE plan from scratch. Do not continue the previous "
+            "output.\n\nERROR:\n"
             + error
-            + "\n\nDEPENDENCY RULES:\n"
-            "- prerequisite_module_ids contains module IDs only.\n"
-            "- prerequisite_lesson_ids contains lesson IDs only.\n"
-            "- never put prose such as 'basic R knowledge' into "
-            "dependency-ID arrays.\n"
-            "- every referenced ID must exist in this same plan.\n"
-            "- no module or lesson may depend on itself.\n\n"
-            "PREVIOUS RESPONSE:\n"
-            + json.dumps(
-                previous_response,
-                indent=2,
-                ensure_ascii=False,
-                default=str,
-            )
+            + "\n\nHARD RULES:\n"
+            "- 1-8 modules total; for ~180 minutes normally 1-4.\n"
+            "- every module contains 1-8 lessons.\n"
+            "- for ~180 minutes normally 3-6 lessons total.\n"
+            "- dependencies reference only EARLIER IDs.\n"
+            "- maximum four dependency IDs per item.\n"
+            "- never generate hundreds or thousands of IDs.\n"
+            "- lesson durations must meaningfully fill the requested time.\n"
+            "\nPREVIOUS RESPONSE PREVIEW ONLY:\n"
+            + preview
         )
 
     @staticmethod
@@ -308,27 +312,17 @@ class CoursePlannerAgent(Agent):
                 module_id=module.module_id,
                 title=module.title,
                 description=module.description,
-                prerequisites=(
-                    module.prerequisite_module_ids
-                ),
+                prerequisites=module.prerequisite_module_ids,
                 lessons=tuple(
                     Lesson(
                         lesson_id=lesson.lesson_id,
                         title=lesson.title,
-                        duration_minutes=(
-                            lesson.duration_minutes
-                        ),
+                        duration_minutes=lesson.duration_minutes,
                         objectives=lesson.objectives,
                         practical=lesson.practical,
-                        requires_live_demo=(
-                            lesson.requires_live_demo
-                        ),
-                        required_packages=(
-                            lesson.required_packages
-                        ),
-                        prerequisites=(
-                            lesson.prerequisite_lesson_ids
-                        ),
+                        requires_live_demo=lesson.requires_live_demo,
+                        required_packages=lesson.required_packages,
+                        prerequisites=lesson.prerequisite_lesson_ids,
                         knowledge_ids=lesson.knowledge_ids,
                     )
                     for lesson in module.lessons
@@ -336,6 +330,36 @@ class CoursePlannerAgent(Agent):
             )
             for module in planned.modules
         )
+
+    @staticmethod
+    def _validate_plan_coverage(
+        *,
+        planned: PlannerResponse,
+        requested_minutes: int,
+    ) -> None:
+        total = sum(
+            lesson.duration_minutes
+            for module in planned.modules
+            for lesson in module.lessons
+        )
+
+        # 50% is a compatibility-safe hard floor. The prompt asks the
+        # model to fill the requested duration much more closely.
+        minimum = max(5, int(requested_minutes * 0.50))
+        maximum = int(requested_minutes * 1.10)
+
+        if total < minimum:
+            raise ValueError(
+                f"planned duration is too short: {total} minutes for a "
+                f"{requested_minutes}-minute course; minimum accepted "
+                f"is {minimum}"
+            )
+        if total > maximum:
+            raise ValueError(
+                f"planned duration is too long: {total} minutes for a "
+                f"{requested_minutes}-minute course; maximum accepted "
+                f"is {maximum}"
+            )
 
     def _generate_valid_plan(
         self,
@@ -349,16 +373,11 @@ class CoursePlannerAgent(Agent):
             local_knowledge=local_knowledge,
         )
         user = original_user
-        last_error = ""
         previous_response = {}
+        last_error = ""
 
-        for attempt in range(
-            1,
-            self.max_attempts + 1,
-        ):
-            request_path = None
+        for attempt in range(1, self.max_attempts + 1):
             response_path = None
-
             if self.trace_dir is not None:
                 request_path = (
                     self.trace_dir
@@ -374,26 +393,19 @@ class CoursePlannerAgent(Agent):
                         "attempt": attempt,
                         "system": system,
                         "user": user,
-                        "json_schema": (
-                            PlannerResponse
-                            .model_json_schema()
-                        ),
+                        "json_schema": PlannerResponse.model_json_schema(),
                     },
                 )
 
             try:
-                planned = (
-                    self.backend.generate_structured(
-                        PlannerResponse,
-                        system=system,
-                        user=user,
-                    )
+                planned = self.backend.generate_structured(
+                    PlannerResponse,
+                    system=system,
+                    user=user,
                 )
-                previous_response = (
-                    planned.model_dump(
-                        mode="json",
-                        by_alias=True,
-                    )
+                previous_response = planned.model_dump(
+                    mode="json",
+                    by_alias=True,
                 )
 
                 if response_path is not None:
@@ -402,20 +414,20 @@ class CoursePlannerAgent(Agent):
                         previous_response,
                     )
 
-                modules = self._to_course_modules(
-                    planned
+                self._validate_plan_coverage(
+                    planned=planned,
+                    requested_minutes=spec.duration_minutes,
                 )
 
-                # Semantic graph validation happens here.
-                # This catches cycles as well as invalid
-                # dependency graphs that cannot be represented
-                # by the static JSON schema alone.
+                modules = self._to_course_modules(planned)
                 schedule = self.scheduler.schedule(
                     modules=modules,
-                    total_duration_minutes=(
-                        spec.duration_minutes
-                    ),
+                    total_duration_minutes=spec.duration_minutes,
                 )
+                if schedule.scheduled_minutes <= 0:
+                    raise ValueError(
+                        "scheduler produced zero scheduled minutes"
+                    )
 
                 if self.trace_dir is not None:
                     self._write_json(
@@ -423,34 +435,24 @@ class CoursePlannerAgent(Agent):
                         {
                             "succeeded": True,
                             "attempts": attempt,
+                            "scheduled_minutes": schedule.scheduled_minutes,
                         },
                     )
-
                 return planned, schedule, attempt
 
             except Exception as exc:
-                last_error = (
-                    f"{type(exc).__name__}: {exc}"
-                )
+                last_error = f"{type(exc).__name__}: {exc}"
 
                 if (
-                    isinstance(
-                        exc,
-                        StructuredOutputError,
-                    )
+                    isinstance(exc, StructuredOutputError)
                     and exc.raw_content
                 ):
                     try:
-                        previous_response = json.loads(
-                            exc.raw_content
-                        )
+                        previous_response = json.loads(exc.raw_content)
                     except Exception:
                         previous_response = {
-                            "_raw_content": (
-                                exc.raw_content
-                            )
+                            "_raw_content": exc.raw_content
                         }
-
                     if response_path is not None:
                         self._write_json(
                             response_path,
@@ -471,9 +473,7 @@ class CoursePlannerAgent(Agent):
                     user = self._repair_prompt(
                         original_user=original_user,
                         error=last_error,
-                        previous_response=(
-                            previous_response
-                        ),
+                        previous_response=previous_response,
                     )
 
         if self.trace_dir is not None:
@@ -487,8 +487,7 @@ class CoursePlannerAgent(Agent):
             )
 
         raise ValueError(
-            "course plan failed after "
-            f"{self.max_attempts} attempts: "
+            f"course plan failed after {self.max_attempts} attempts: "
             f"{last_error}"
         )
 
@@ -496,31 +495,20 @@ class CoursePlannerAgent(Agent):
         self,
         context: JobContext,
     ) -> AgentResult:
-        spec_raw = context.state.get(
-            "course_specification"
-        )
+        spec_raw = context.state.get("course_specification")
         if not isinstance(spec_raw, dict):
             return AgentResult.failed(
                 agent_name=self.name,
-                errors=(
-                    "course_specification is missing",
-                ),
+                errors=("course_specification is missing",),
             )
 
         try:
-            spec = CourseSpecification.model_validate(
-                spec_raw
-            )
+            spec = CourseSpecification.model_validate(spec_raw)
             local_knowledge = context.state.get(
                 "local_knowledge_results",
                 [],
             )
-
-            (
-                planned,
-                schedule,
-                attempts,
-            ) = self._generate_valid_plan(
+            _, schedule, attempts = self._generate_valid_plan(
                 spec=spec,
                 local_knowledge=local_knowledge,
             )
@@ -530,27 +518,18 @@ class CoursePlannerAgent(Agent):
                 audience=spec.audience,
                 language=spec.language,
                 modules=schedule.modules,
-                learning_objectives=(
-                    spec.learning_objectives
-                ),
+                learning_objectives=spec.learning_objectives,
                 required_packages=tuple(
                     sorted(
-                        set(
-                            spec.required_packages
-                        ).union(
+                        set(spec.required_packages).union(
                             package
-                            for module
-                            in schedule.modules
-                            for lesson
-                            in module.lessons
-                            for package
-                            in lesson.required_packages
+                            for module in schedule.modules
+                            for lesson in module.lessons
+                            for package in lesson.required_packages
                         )
                     )
                 ),
-                total_duration_minutes=(
-                    spec.duration_minutes
-                ),
+                total_duration_minutes=spec.duration_minutes,
                 assumptions=spec.assumptions,
                 references=tuple(
                     str(item.get("document_id"))
@@ -563,51 +542,31 @@ class CoursePlannerAgent(Agent):
         except Exception as exc:
             return AgentResult.failed(
                 agent_name=self.name,
-                errors=(
-                    f"{type(exc).__name__}: {exc}",
-                ),
+                errors=(f"{type(exc).__name__}: {exc}",),
             )
 
         return AgentResult.success(
             agent_name=self.name,
             outputs={
-                "course_outline": (
-                    outline.model_dump(
-                        mode="json"
-                    )
-                ),
+                "course_outline": outline.model_dump(mode="json"),
                 "schedule_summary": {
-                    "scheduled_minutes": (
-                        schedule.scheduled_minutes
-                    ),
-                    "unscheduled_minutes": (
-                        schedule.unscheduled_minutes
-                    ),
-                    "module_count": len(
-                        schedule.modules
-                    ),
+                    "scheduled_minutes": schedule.scheduled_minutes,
+                    "unscheduled_minutes": schedule.unscheduled_minutes,
+                    "module_count": len(schedule.modules),
                     "lesson_count": sum(
                         len(module.lessons)
-                        for module
-                        in schedule.modules
+                        for module in schedule.modules
                     ),
                 },
             },
             metrics={
-                "module_count": len(
-                    schedule.modules
-                ),
+                "module_count": len(schedule.modules),
                 "lesson_count": sum(
                     len(module.lessons)
                     for module in schedule.modules
                 ),
-                "scheduled_minutes": (
-                    schedule.scheduled_minutes
-                ),
+                "scheduled_minutes": schedule.scheduled_minutes,
                 "planner_attempts": attempts,
-                "planner_retries": max(
-                    0,
-                    attempts - 1,
-                ),
+                "planner_retries": max(0, attempts - 1),
             },
         )

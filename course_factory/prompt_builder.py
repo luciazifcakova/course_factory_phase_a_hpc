@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-INPUT_BUILDER_PROMPT_VERSION = "1.0.0"
+INPUT_BUILDER_PROMPT_VERSION = "1.1.0"
 
 SYSTEM_PROMPT = (
-    "You are an input builder for R training courses. Convert short requests into "
-    "a structured course specification. Infer sensible defaults. Preserve explicit "
-    "duration, audience, package and level constraints. Ask for clarification only "
-    "when the actual topic or package is ambiguous."
+    "You are an input builder for R training courses. Convert short "
+    "requests into a structured course specification. Infer sensible "
+    "defaults. Preserve explicit duration, audience, package and level "
+    "constraints. Ask for clarification only when the actual topic or "
+    "package is ambiguous. For a normal course request, always create "
+    "3-6 concrete learning objectives. Never return an empty "
+    "learning_objectives array unless clarification_required is true."
 )
 
 SCHEMA_HINT = '''{
@@ -18,7 +21,11 @@ SCHEMA_HINT = '''{
   "delivery_mode": "online",
   "level": "beginner",
   "prerequisites": ["string"],
-  "learning_objectives": ["string"],
+  "learning_objectives": [
+    "Create a basic plot",
+    "Map variables to aesthetics",
+    "Customize plots for scientific communication"
+  ],
   "required_packages": ["string"],
   "exercise_count": 4,
   "assumptions": ["string"],
@@ -26,5 +33,7 @@ SCHEMA_HINT = '''{
   "clarification_question": null
 }'''
 
-def build_input_builder_prompt(user_request: str) -> tuple[str, str, str]:
+def build_input_builder_prompt(
+    user_request: str,
+) -> tuple[str, str, str]:
     return SYSTEM_PROMPT, user_request, SCHEMA_HINT

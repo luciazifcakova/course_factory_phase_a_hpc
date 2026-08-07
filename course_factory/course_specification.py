@@ -12,7 +12,7 @@ class CourseSpecification(BaseModel):
     delivery_mode: str = Field(default="online")
     level: str = Field(default="beginner")
     prerequisites: tuple[str, ...] = ()
-    learning_objectives: tuple[str, ...] = ()
+    learning_objectives: tuple[str, ...] = Field(min_length=1, max_length=8)
     required_packages: tuple[str, ...] = ()
     exercise_count: int = Field(default=4, ge=0, le=20)
     assumptions: tuple[str, ...] = ()
