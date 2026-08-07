@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "course-factory"
-version = "1.13.7"
+version = "1.13.8"
 description = "Supervisor-driven local AI course factory"
 requires-python = ">=3.11"
 dependencies = [

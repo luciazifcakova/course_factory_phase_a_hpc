@@ -55,7 +55,7 @@ class RWorkflowPlannerAgent(Agent):
                                 lesson_id=lesson.lesson_id,
                                 description=f"Generate visual output for {lesson.title}",
                                 input_artifacts=(f"scripts/{lesson.lesson_id}.R",),
-                                output_artifacts=("figures/*.png",),
+                                output_artifacts=("figures/*",),
                                 depends_on=(code_task_id,),
                                 required_packages=lesson.required_packages,
                                 estimated_minutes=max(1, lesson.duration_minutes // 10),
@@ -75,7 +75,7 @@ class RWorkflowPlannerAgent(Agent):
                             input_artifacts=(
                                 f"scripts/{lesson.lesson_id}.R",
                                 *(
-                                    ("figures/*.png",)
+                                    ("figures/*",)
                                     if lesson.practical or lesson.requires_live_demo
                                     else ()
                                 ),

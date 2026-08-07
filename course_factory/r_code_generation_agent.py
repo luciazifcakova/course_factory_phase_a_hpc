@@ -92,69 +92,65 @@ class RCodeGenerationAgent(Agent):
 
 
     @staticmethod
+    def _matches_contract(output: str, contract: str) -> bool:
+        path = PurePosixPath(output)
+        if contract == "figures/*":
+            return (
+                len(path.parts) >= 2
+                and path.parts[0] == "figures"
+                and path.suffix.lower() in {".png", ".pdf"}
+            )
+        return fnmatch(output, contract)
+
+    @classmethod
     def _validate_output_contracts(
+        cls,
         *,
         contracts: tuple[str, ...],
         concrete_outputs: tuple[str, ...],
     ) -> tuple[str, ...]:
-        if not contracts:
-            return concrete_outputs
-
-        if not concrete_outputs:
-            raise ValueError(
-                "The LLM returned no concrete expected_outputs for "
-                f"required contracts {list(contracts)!r}."
-            )
-
-        normalized_outputs = []
+        normalized: list[str] = []
         for output in concrete_outputs:
             path = PurePosixPath(output)
-            if (
-                path.parts
-                and path.parts[0] == "figures"
-                and path.suffix.lower() not in {".png", ".pdf"}
-            ):
+            if path.is_absolute() or ".." in path.parts:
+                raise ValueError(f"Unsafe expected output path: {output!r}")
+            if path.parts and path.parts[0] == "scripts":
+                raise ValueError(
+                    "R source files must not appear in expected_outputs: "
+                    f"{output!r}"
+                )
+            if (path.parts and path.parts[0] == "figures" and
+                    path.suffix.lower() not in {".png", ".pdf"}):
                 raise ValueError(
                     "Figure outputs must be PNG or PDF only; "
                     f"received {output!r}"
                 )
-            if path.is_absolute() or ".." in path.parts:
-                raise ValueError(
-                    f"Unsafe expected output path: {output!r}"
-                )
-            normalized_outputs.append(path.as_posix())
+            normalized.append(path.as_posix())
 
-        unmatched_outputs = [
-            output
-            for output in normalized_outputs
-            if not any(
-                fnmatch(output, contract)
+        outside = [
+            output for output in normalized
+            if contracts and not any(
+                cls._matches_contract(output, contract)
                 for contract in contracts
             )
         ]
-        if unmatched_outputs:
+        if outside:
             raise ValueError(
-                "LLM returned outputs outside the workflow contracts; "
-                f"contracts={list(contracts)!r}, "
-                f"outside={unmatched_outputs!r}"
+                "LLM declared outputs outside the workflow contracts; "
+                f"contracts={list(contracts)!r}, outside={outside!r}"
             )
 
-        missing_contracts = [
-            contract
-            for contract in contracts
-            if not any(
-                fnmatch(output, contract)
-                for output in normalized_outputs
-            )
-        ]
-        if missing_contracts:
-            raise ValueError(
-                "No generated output satisfies workflow contracts: "
-                f"{missing_contracts!r}; returned="
-                f"{normalized_outputs!r}"
-            )
-
-        return tuple(dict.fromkeys(normalized_outputs))
+        if contracts:
+            missing = [
+                contract for contract in contracts
+                if not any(cls._matches_contract(output, contract) for output in normalized)
+            ]
+            if missing:
+                raise ValueError(
+                    "LLM did not declare a concrete output satisfying planner contracts: "
+                    f"{missing!r}"
+                )
+        return tuple(dict.fromkeys(normalized))
 
     @staticmethod
     def _validation_messages(
@@ -438,6 +434,9 @@ class RCodeGenerationAgent(Agent):
                             ),
                             expected_outputs=(
                                 expected_outputs
+                            ),
+                            output_contracts=(
+                                required_outputs
                             ),
                             knowledge_ids=(
                                 validated.knowledge_ids

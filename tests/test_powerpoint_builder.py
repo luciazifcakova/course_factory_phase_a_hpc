@@ -51,7 +51,7 @@ def build_deck():
                 speaker_notes="Demonstrate with iris.",
                 references=("DOC-1",),
                 code_artifact="scripts/scatter.R",
-                figure_artifact="figures/*.png",
+                figure_artifact="figures/*",
             ),
         ),
     )
@@ -76,7 +76,7 @@ def test_builder_creates_powerpoint(tmp_path):
     assert report.slide_count == 3
     assert report.code_block_count == 1
     assert report.figure_count == 0
-    assert report.missing_artifacts == ("figures/*.png",)
+    assert report.missing_artifacts == ("figures/*",)
 
     prs = Presentation(output)
     assert len(prs.slides) == 3

@@ -72,7 +72,7 @@ def test_slide_content_agent_builds_valid_deck():
                     "speaker_notes": "Demonstrate with iris.",
                     "references": ["DOC-1"],
                     "code_artifact": "scripts/scatter.R",
-                    "figure_artifact": "figures/*.png",
+                    "figure_artifact": "figures/*",
                 }
             ],
         }

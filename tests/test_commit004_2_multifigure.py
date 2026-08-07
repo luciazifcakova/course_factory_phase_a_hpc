@@ -65,7 +65,7 @@ PLAN = {
             "lesson_id": "LES-002",
             "description": "Generate figures",
             "input_artifacts": ["scripts/LES-002.R"],
-            "output_artifacts": ["figures/*.png"],
+            "output_artifacts": ["figures/*"],
             "depends_on": ["LES-002.r_code"],
             "required_packages": ["ggplot2"],
             "estimated_minutes": 3,
@@ -228,5 +228,5 @@ def test_workflow_planner_uses_figure_collection_contract():
         if task["task_type"] == "figure"
     ]
     assert figure_tasks[0]["output_artifacts"] == [
-        "figures/*.png"
+        "figures/*"
     ]

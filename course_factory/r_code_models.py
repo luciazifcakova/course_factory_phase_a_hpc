@@ -75,7 +75,10 @@ class RScriptArtifact(BaseModel):
     relative_path: str = Field(min_length=3)
     code: str = Field(min_length=1)
     required_packages: tuple[str, ...] = ()
+    # LLM-declared concrete outputs are provenance only.
     expected_outputs: tuple[str, ...] = ()
+    # Immutable workflow-planner contracts define execution success.
+    output_contracts: tuple[str, ...] = ()
     knowledge_ids: tuple[str, ...] = ()
 
     @model_validator(mode="after")

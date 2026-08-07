@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from fnmatch import fnmatch
 import json
 from pathlib import Path
 import shutil
@@ -127,30 +128,36 @@ class CourseExecutionService:
         return tuple(outputs)
 
     @staticmethod
-    def _check_expected_outputs(
-        output_dir: Path,
-        expected_outputs: tuple[str, ...],
+    def _contract_matches(relative_path: str, contract: str) -> bool:
+        path = Path(relative_path)
+        if contract == "figures/*":
+            return (
+                len(path.parts) >= 2
+                and path.parts[0] == "figures"
+                and path.suffix.lower() in {".png", ".pdf"}
+            )
+        return fnmatch(relative_path, contract)
+
+    @classmethod
+    def _check_output_contracts(
+        cls,
+        *,
+        outputs: tuple[ExecutedOutput, ...],
+        contracts: tuple[str, ...],
     ) -> tuple[tuple[str, ...], tuple[str, ...]]:
-        found = []
-        missing = []
-
-        for expected in expected_outputs:
-            relative = Path(expected)
-            if (
-                relative.is_absolute()
-                or ".." in relative.parts
-            ):
-                raise ValueError(
-                    "Unsafe expected output path: "
-                    f"{expected}"
-                )
-
-            if (output_dir / relative).is_file():
-                found.append(relative.as_posix())
+        produced = tuple(output.relative_path for output in outputs)
+        found: list[str] = []
+        missing: list[str] = []
+        for contract in contracts:
+            path = Path(contract)
+            if path.is_absolute() or ".." in path.parts:
+                raise ValueError(f"Unsafe output contract: {contract}")
+            matches = [p for p in produced if cls._contract_matches(p, contract)]
+            if matches:
+                found.extend(matches)
             else:
-                missing.append(relative.as_posix())
-
-        return tuple(found), tuple(missing)
+                missing.append(contract)
+        return tuple(dict.fromkeys(found)), tuple(missing)
 
     @staticmethod
     def _reset_output_directory(
@@ -212,6 +219,7 @@ class CourseExecutionService:
         produced_outputs: tuple[ExecutedOutput, ...],
         task_directory: Path,
         repair_number: int,
+        output_contracts: tuple[str, ...],
     ) -> tuple[str | None, Path, Path | None, tuple[str, ...]]:
         trace_dir = (
             task_directory
@@ -223,23 +231,28 @@ class CourseExecutionService:
 
         system = (
             "You are repairing an R teaching script that failed in a "
-            "non-interactive Apptainer execution. Return the complete "
-            "corrected script as JSON. Preserve the educational intent. "
-            "Use only approved packages. Do not install packages, access "
-            "the network, call system commands, use absolute paths, call "
-            "setwd(), or require user interaction. Every required output "
-            "must be written to its exact relative path. Create parent "
-            "directories with dir.create(..., recursive=TRUE, "
-            "showWarnings=FALSE). For ggplot2 figures, use ggsave with "
-            "the exact required path. Do not save into plots/ when the "
-            "required path begins with figures/."
+            "non-interactive Apptainer execution. Return the complete corrected script "
+            "as JSON. Preserve educational intent. Use only approved packages. Do not "
+            "install packages, access the network, call system commands, use absolute "
+            "paths, call setwd(), or require user interaction. WORKFLOW OUTPUT CONTRACTS "
+            "are immutable and planner-owned. For figures/* create at least one PNG or "
+            "PDF explicitly under figures/. Prefer PNG. Never use SVG. Never rely on an "
+            "implicit Rplots.pdf device; save every plot with ggsave(), png()/dev.off(), "
+            "or pdf()/dev.off(). Never list scripts/*.R as a runtime output. Use real "
+            "approved-package functions only; for log axes use scale_x_log10(), "
+            "scale_y_log10(), or documented transforms, never coord_log10(). The response "
+            "expected_outputs list is provenance only and may be empty. Execution success "
+            "is decided from workflow contracts and actual files."
         )
+
         user = (
             f"TASK ID: {script.task_id}\n"
             f"LESSON ID: {script.lesson_id}\n"
             f"APPROVED PACKAGES: "
             f"{list(script.required_packages)!r}\n"
-            f"REQUIRED OUTPUTS: "
+            f"WORKFLOW OUTPUT CONTRACTS: "
+            f"{list(output_contracts)!r}\n"
+            f"PREVIOUS LLM-DECLARED OUTPUTS (advisory): "
             f"{list(script.expected_outputs)!r}\n\n"
             f"CURRENT SCRIPT:\n{current_code}\n\n"
             "EXECUTION DIAGNOSTICS:\n"
@@ -267,7 +280,6 @@ class CourseExecutionService:
                 (
                     "No LLM backend is configured for repair.",
                 ),
-                None,
             )
 
         try:
@@ -278,55 +290,30 @@ class CourseExecutionService:
             )
             raw = response.model_dump(mode="json")
             self._write_json(response_path, raw)
-            repaired_outputs = tuple(
-                response.expected_outputs
-                or script.expected_outputs
-            )
-
-            original_outputs = set(
-                script.expected_outputs
-            )
-            invented = (
-                set(repaired_outputs)
-                - original_outputs
-            )
-            if invented:
-                raise ValueError(
-                    "Repaired expected_outputs introduced new "
-                    "unplanned outputs: "
-                    + ", ".join(sorted(invented))
-                )
-
+            repaired_outputs = tuple(response.expected_outputs)
             for output in repaired_outputs:
                 path = Path(output)
-                if (
-                    path.parts
-                    and path.parts[0] == "figures"
-                    and path.suffix.lower()
-                    not in {".png", ".pdf"}
+                if path.is_absolute() or ".." in path.parts:
+                    raise ValueError(f"Unsafe repaired output path: {output!r}")
+                if path.parts and path.parts[0] == "scripts":
+                    raise ValueError(
+                        "R source files are not execution outputs: "
+                        f"{output!r}"
+                    )
+                if (path.parts and path.parts[0] == "figures" and
+                        path.suffix.lower() not in {".png", ".pdf"}):
+                    raise ValueError(
+                        "Repaired figure outputs must be PNG or PDF only; "
+                        f"received {output!r}"
+                    )
+                if output_contracts and not any(
+                    self._contract_matches(output, contract)
+                    for contract in output_contracts
                 ):
                     raise ValueError(
-                        "Repaired figure outputs must be PNG or "
-                        f"PDF only; received {output!r}"
+                        "Repaired output is outside planner-owned contracts: "
+                        f"{output!r}"
                     )
-
-            if (
-                any(
-                    Path(output).parts
-                    and Path(output).parts[0] == "figures"
-                    for output in script.expected_outputs
-                )
-                and not any(
-                    Path(output).parts
-                    and Path(output).parts[0] == "figures"
-                    and Path(output).suffix.lower()
-                    in {".png", ".pdf"}
-                    for output in repaired_outputs
-                )
-            ):
-                raise ValueError(
-                    "Repair removed all usable PNG/PDF figure outputs."
-                )
 
             unknown_knowledge = (
                 set(response.knowledge_ids)
@@ -363,22 +350,20 @@ class CourseExecutionService:
 
             # Output-path references are warnings in the general
             # validator, but they are mandatory for a repaired script.
-            missing_references = tuple(
-                issue.message
-                for issue in warnings
-                if issue.rule == "output_not_referenced"
-            )
-            if missing_references:
-                raise ValueError(
-                    "; ".join(missing_references)
+            if repaired_outputs:
+                missing_references = tuple(
+                    issue.message
+                    for issue in warnings
+                    if issue.rule == "output_not_referenced"
                 )
+                if missing_references:
+                    raise ValueError("; ".join(missing_references))
 
             return (
                 response.code,
                 request_path,
                 response_path,
                 (),
-                repaired_outputs,
             )
         except Exception as exc:
             return (
@@ -390,7 +375,6 @@ class CourseExecutionService:
                     else None
                 ),
                 self._repair_validation_errors(exc),
-                None,
             )
 
     def _run_script_once(
@@ -402,40 +386,23 @@ class CourseExecutionService:
         image: Path,
         runtime: RuntimeKind,
         resources: ResourceRequest,
-        expected_outputs: tuple[str, ...] | None = None,
-    ) -> tuple[
-        RuntimeResult,
-        tuple[str, ...],
-        tuple[str, ...],
-        tuple[ExecutedOutput, ...],
-    ]:
-        shutil.copy2(
-            code_path,
-            task_directory / "script.R",
-        )
-        output_dir = self._reset_output_directory(
-            task_directory
-        )
-
+        output_contracts: tuple[str, ...],
+    ) -> tuple[RuntimeResult, tuple[str, ...], tuple[str, ...], tuple[ExecutedOutput, ...]]:
+        shutil.copy2(code_path, task_directory / "script.R")
+        output_dir = self._reset_output_directory(task_directory)
         task = build_apptainer_r_task(
             task_id=script.task_id,
             task_directory=task_directory,
             image=image,
             runtime=runtime,
             resources=resources,
-            timeout_seconds=(
-                self.settings.local_timeout_seconds
-            ),
+            timeout_seconds=self.settings.local_timeout_seconds,
         )
         runtime_result = self.router.execute(task)
         outputs = self._collect_outputs(output_dir)
-        found, missing = self._check_expected_outputs(
-            output_dir,
-            (
-                expected_outputs
-                if expected_outputs is not None
-                else script.expected_outputs
-            ),
+        found, missing = self._check_output_contracts(
+            outputs=outputs,
+            contracts=output_contracts,
         )
         return runtime_result, found, missing, outputs
 
@@ -499,9 +466,45 @@ class CourseExecutionService:
                 raise FileNotFoundError(source)
 
             current_code_path = source
-            current_expected_outputs = (
-                script.expected_outputs
-            )
+            if script.output_contracts:
+                output_contracts = script.output_contracts
+            else:
+                # Backward compatibility for artifacts generated before
+                # output_contracts existed. A single clean concrete figure
+                # remains exact for legacy behavior. Ambiguous legacy
+                # metadata (multiple figures, scripts/*.R leakage, or old
+                # unsupported formats) is normalized to the collection
+                # contract figures/*.
+                figure_outputs: list[str] = []
+                other_outputs: list[str] = []
+                has_source_leak = False
+                has_unsupported_figure = False
+
+                for declared in script.expected_outputs:
+                    path = Path(declared)
+                    if path.parts and path.parts[0] == "scripts":
+                        has_source_leak = True
+                        continue
+                    if path.parts and path.parts[0] == "figures":
+                        figure_outputs.append(declared)
+                        if path.suffix.lower() not in {".png", ".pdf"}:
+                            has_unsupported_figure = True
+                        continue
+                    other_outputs.append(declared)
+
+                inferred: list[str] = list(other_outputs)
+                if figure_outputs:
+                    if (
+                        len(figure_outputs) > 1
+                        or has_source_leak
+                        or has_unsupported_figure
+                    ):
+                        inferred.append("figures/*")
+                    else:
+                        inferred.append(figure_outputs[0])
+
+                output_contracts = tuple(dict.fromkeys(inferred))
+
             attempts = []
             final_runtime = None
             final_found = ()
@@ -529,9 +532,7 @@ class CourseExecutionService:
                     image=image,
                     runtime=runtime,
                     resources=resources,
-                    expected_outputs=(
-                        current_expected_outputs
-                    ),
+                    output_contracts=output_contracts,
                 )
 
                 final_runtime = runtime_result
@@ -568,7 +569,6 @@ class CourseExecutionService:
                     request_path,
                     response_path,
                     errors,
-                    repaired_outputs,
                 ) = (
                     self._repair_script(
                         script=script,
@@ -582,6 +582,7 @@ class CourseExecutionService:
                         produced_outputs=outputs,
                         task_directory=task_directory,
                         repair_number=execution_number,
+                        output_contracts=output_contracts,
                     )
                 )
                 attempts.append(
@@ -602,11 +603,6 @@ class CourseExecutionService:
 
                 if repaired_code is None:
                     break
-
-                if repaired_outputs is not None:
-                    current_expected_outputs = (
-                        repaired_outputs
-                    )
 
                 repair_count += 1
                 total_repairs += 1
