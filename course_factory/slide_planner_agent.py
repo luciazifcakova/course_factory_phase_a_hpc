@@ -87,11 +87,7 @@ class SlidePlannerAgent(Agent):
             item.relative_path
             for item in lesson_manifest.figures
         }
-        allowed_code = (
-            lesson_manifest.script.relative_path
-            if lesson_manifest.script is not None
-            else None
-        )
+        has_code = lesson_manifest.script is not None
 
         for slide in plan.slides:
             unknown_figures = (
@@ -107,14 +103,10 @@ class SlidePlannerAgent(Agent):
                     )
                 )
 
-            if (
-                slide.code_artifact is not None
-                and slide.code_artifact
-                != allowed_code
-            ):
+            if slide.use_code and not has_code:
                 raise ValueError(
-                    f"slide {slide.slide_id!r} references "
-                    "an unknown code artifact"
+                    f"slide {slide.slide_id!r} requests code, "
+                    "but this lesson has no script artifact"
                 )
 
     @staticmethod
@@ -127,6 +119,8 @@ class SlidePlannerAgent(Agent):
             "content yet; the purpose field describes what each slide "
             "should teach. You may reference ONLY figure and code paths "
             "listed in AVAILABLE ARTIFACTS. Never invent filenames. "
+            "For code slides set use_code=true and never return a script "
+            "path; Python inserts the exact lesson script later. "
             "Prefer PNG figures for visual slides. Use at most two "
             "figures on one slide. Include a title/overview slide and "
             "a summary or exercise when pedagogically useful."
@@ -153,12 +147,8 @@ class SlidePlannerAgent(Agent):
             + json.dumps(
                 {
                     "figures": available_figures,
-                    "code": (
-                        lesson_manifest
-                        .script.relative_path
-                        if lesson_manifest.script
-                        is not None
-                        else None
+                    "code_available": (
+                        lesson_manifest.script is not None
                     ),
                 },
                 indent=2,

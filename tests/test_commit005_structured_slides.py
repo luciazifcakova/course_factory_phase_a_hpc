@@ -190,7 +190,7 @@ def valid_plan():
                 ),
                 "layout": "title",
                 "figure_artifacts": [],
-                "code_artifact": None,
+                "use_code": False,
             },
             {
                 "slide_id": "LES-001-S02",
@@ -205,7 +205,7 @@ def valid_plan():
                     "tasks/LES-001.r_code/output/"
                     "figures/scatter.png"
                 ],
-                "code_artifact": None,
+                "use_code": False,
             },
             {
                 "slide_id": "LES-001-S03",
@@ -216,7 +216,7 @@ def valid_plan():
                 ),
                 "layout": "exercise",
                 "figure_artifacts": [],
-                "code_artifact": None,
+                "use_code": False,
             },
         ],
     }

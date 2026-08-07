@@ -35,7 +35,9 @@ class SlidePlanItem(BaseModel):
         default=(),
         max_length=2,
     )
-    code_artifact: str | None = None
+    # The LLM only chooses whether a code slide is useful.
+    # Python resolves the exact script path from artifact_manifest.json.
+    use_code: bool = False
 
     @model_validator(mode="after")
     def validate_layout_artifacts(
@@ -63,10 +65,17 @@ class SlidePlanItem(BaseModel):
             )
         if (
             self.layout is SlideLayout.CODE
-            and self.code_artifact is None
+            and not self.use_code
         ):
             raise ValueError(
-                "code slide requires code_artifact"
+                "code slide requires use_code=true"
+            )
+        if (
+            self.layout is not SlideLayout.CODE
+            and self.use_code
+        ):
+            raise ValueError(
+                "use_code=true is only valid for code layout"
             )
         return self
 

@@ -6,6 +6,7 @@ from pathlib import Path
 from .agent import Agent
 from .agent_result import AgentResult
 from .job_context import JobContext
+from .job_artifacts import ArtifactManifest
 from .lesson_content_models import (
     LessonContentSet,
 )
@@ -127,6 +128,9 @@ class SlideGenerationAgent(Agent):
             "approved_r_scripts",
             [],
         )
+        manifest_raw = context.state.get(
+            "artifact_manifest"
+        )
 
         if not isinstance(plan_raw, dict):
             return AgentResult.failed(
@@ -137,6 +141,11 @@ class SlideGenerationAgent(Agent):
             return AgentResult.failed(
                 agent_name=self.name,
                 errors=("lesson_content is missing",),
+            )
+        if not isinstance(manifest_raw, dict):
+            return AgentResult.failed(
+                agent_name=self.name,
+                errors=("artifact_manifest is missing",),
             )
 
         try:
@@ -150,6 +159,13 @@ class SlideGenerationAgent(Agent):
                     content_raw
                 )
             )
+            manifest = ArtifactManifest.model_validate(
+                manifest_raw
+            )
+            manifest_by_id = {
+                item.lesson_id: item
+                for item in manifest.lessons
+            }
             content_by_id = {
                 lesson.lesson_id: lesson
                 for lesson
@@ -292,8 +308,16 @@ class SlideGenerationAgent(Agent):
                                         source.source_ids
                                     ),
                                     code_artifact=(
-                                        planned
-                                        .code_artifact
+                                        manifest_by_id[
+                                            plan.lesson_id
+                                        ].script.relative_path
+                                        if (
+                                            planned.use_code
+                                            and manifest_by_id[
+                                                plan.lesson_id
+                                            ].script is not None
+                                        )
+                                        else None
                                     ),
                                     figure_artifact=(
                                         planned
