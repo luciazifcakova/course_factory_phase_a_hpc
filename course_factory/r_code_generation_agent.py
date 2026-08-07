@@ -109,6 +109,15 @@ class RCodeGenerationAgent(Agent):
         normalized_outputs = []
         for output in concrete_outputs:
             path = PurePosixPath(output)
+            if (
+                path.parts
+                and path.parts[0] == "figures"
+                and path.suffix.lower() not in {".png", ".pdf"}
+            ):
+                raise ValueError(
+                    "Figure outputs must be PNG or PDF only; "
+                    f"received {output!r}"
+                )
             if path.is_absolute() or ".." in path.parts:
                 raise ValueError(
                     f"Unsafe expected output path: {output!r}"

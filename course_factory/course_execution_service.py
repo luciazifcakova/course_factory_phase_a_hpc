@@ -267,6 +267,7 @@ class CourseExecutionService:
                 (
                     "No LLM backend is configured for repair.",
                 ),
+                None,
             )
 
         try:
@@ -277,14 +278,54 @@ class CourseExecutionService:
             )
             raw = response.model_dump(mode="json")
             self._write_json(response_path, raw)
+            repaired_outputs = tuple(
+                response.expected_outputs
+                or script.expected_outputs
+            )
+
+            original_outputs = set(
+                script.expected_outputs
+            )
+            invented = (
+                set(repaired_outputs)
+                - original_outputs
+            )
+            if invented:
+                raise ValueError(
+                    "Repaired expected_outputs introduced new "
+                    "unplanned outputs: "
+                    + ", ".join(sorted(invented))
+                )
+
+            for output in repaired_outputs:
+                path = Path(output)
+                if (
+                    path.parts
+                    and path.parts[0] == "figures"
+                    and path.suffix.lower()
+                    not in {".png", ".pdf"}
+                ):
+                    raise ValueError(
+                        "Repaired figure outputs must be PNG or "
+                        f"PDF only; received {output!r}"
+                    )
+
             if (
-                set(response.expected_outputs)
-                != set(script.expected_outputs)
+                any(
+                    Path(output).parts
+                    and Path(output).parts[0] == "figures"
+                    for output in script.expected_outputs
+                )
+                and not any(
+                    Path(output).parts
+                    and Path(output).parts[0] == "figures"
+                    and Path(output).suffix.lower()
+                    in {".png", ".pdf"}
+                    for output in repaired_outputs
+                )
             ):
                 raise ValueError(
-                    "Repaired expected_outputs must exactly match "
-                    f"{list(script.expected_outputs)!r}; received "
-                    f"{list(response.expected_outputs)!r}."
+                    "Repair removed all usable PNG/PDF figure outputs."
                 )
 
             unknown_knowledge = (
@@ -303,7 +344,7 @@ class CourseExecutionService:
                 allowed_packages=script.required_packages
             ).validate(
                 response.code,
-                script.expected_outputs,
+                repaired_outputs,
             )
             errors = tuple(
                 (
@@ -337,6 +378,7 @@ class CourseExecutionService:
                 request_path,
                 response_path,
                 (),
+                repaired_outputs,
             )
         except Exception as exc:
             return (
@@ -348,6 +390,7 @@ class CourseExecutionService:
                     else None
                 ),
                 self._repair_validation_errors(exc),
+                None,
             )
 
     def _run_script_once(
@@ -359,6 +402,7 @@ class CourseExecutionService:
         image: Path,
         runtime: RuntimeKind,
         resources: ResourceRequest,
+        expected_outputs: tuple[str, ...] | None = None,
     ) -> tuple[
         RuntimeResult,
         tuple[str, ...],
@@ -387,7 +431,11 @@ class CourseExecutionService:
         outputs = self._collect_outputs(output_dir)
         found, missing = self._check_expected_outputs(
             output_dir,
-            script.expected_outputs,
+            (
+                expected_outputs
+                if expected_outputs is not None
+                else script.expected_outputs
+            ),
         )
         return runtime_result, found, missing, outputs
 
@@ -451,6 +499,9 @@ class CourseExecutionService:
                 raise FileNotFoundError(source)
 
             current_code_path = source
+            current_expected_outputs = (
+                script.expected_outputs
+            )
             attempts = []
             final_runtime = None
             final_found = ()
@@ -478,6 +529,9 @@ class CourseExecutionService:
                     image=image,
                     runtime=runtime,
                     resources=resources,
+                    expected_outputs=(
+                        current_expected_outputs
+                    ),
                 )
 
                 final_runtime = runtime_result
@@ -509,7 +563,13 @@ class CourseExecutionService:
                     attempts.append(attempt)
                     break
 
-                repaired_code, request_path, response_path, errors = (
+                (
+                    repaired_code,
+                    request_path,
+                    response_path,
+                    errors,
+                    repaired_outputs,
+                ) = (
                     self._repair_script(
                         script=script,
                         current_code=(
@@ -542,6 +602,11 @@ class CourseExecutionService:
 
                 if repaired_code is None:
                     break
+
+                if repaired_outputs is not None:
+                    current_expected_outputs = (
+                        repaired_outputs
+                    )
 
                 repair_count += 1
                 total_repairs += 1
