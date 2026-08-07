@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from fnmatch import fnmatch
+from pathlib import PurePosixPath
 from pathlib import Path
 import re
 
@@ -87,6 +89,63 @@ class RCodeGenerationAgent(Agent):
             ):
                 outputs.extend(task.output_artifacts)
         return tuple(dict.fromkeys(outputs))
+
+
+    @staticmethod
+    def _validate_output_contracts(
+        *,
+        contracts: tuple[str, ...],
+        concrete_outputs: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        if not contracts:
+            return concrete_outputs
+
+        if not concrete_outputs:
+            raise ValueError(
+                "The LLM returned no concrete expected_outputs for "
+                f"required contracts {list(contracts)!r}."
+            )
+
+        normalized_outputs = []
+        for output in concrete_outputs:
+            path = PurePosixPath(output)
+            if path.is_absolute() or ".." in path.parts:
+                raise ValueError(
+                    f"Unsafe expected output path: {output!r}"
+                )
+            normalized_outputs.append(path.as_posix())
+
+        unmatched_outputs = [
+            output
+            for output in normalized_outputs
+            if not any(
+                fnmatch(output, contract)
+                for contract in contracts
+            )
+        ]
+        if unmatched_outputs:
+            raise ValueError(
+                "LLM returned outputs outside the workflow contracts; "
+                f"contracts={list(contracts)!r}, "
+                f"outside={unmatched_outputs!r}"
+            )
+
+        missing_contracts = [
+            contract
+            for contract in contracts
+            if not any(
+                fnmatch(output, contract)
+                for output in normalized_outputs
+            )
+        ]
+        if missing_contracts:
+            raise ValueError(
+                "No generated output satisfies workflow contracts: "
+                f"{missing_contracts!r}; returned="
+                f"{normalized_outputs!r}"
+            )
+
+        return tuple(dict.fromkeys(normalized_outputs))
 
     @staticmethod
     def _validation_messages(
@@ -328,21 +387,11 @@ class RCodeGenerationAgent(Agent):
                             validated.expected_outputs
                         )
                         expected_outputs = (
-                            required_outputs
-                            or returned_outputs
-                        )
-
-                        if (
-                            required_outputs
-                            and set(returned_outputs)
-                            != set(required_outputs)
-                        ):
-                            raise ValueError(
-                                "LLM expected_outputs did not "
-                                "exactly match required outputs; "
-                                f"required={list(required_outputs)!r}, "
-                                f"returned={list(returned_outputs)!r}"
+                            self._validate_output_contracts(
+                                contracts=required_outputs,
+                                concrete_outputs=returned_outputs,
                             )
+                        )
 
                         allowed_knowledge_ids = set(
                             lesson.knowledge_ids

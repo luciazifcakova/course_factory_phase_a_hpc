@@ -6,7 +6,7 @@ def test_validator_rejects_system():
     result=RCodeValidator(allowed_packages=('ggplot2',)).validate('library(ggplot2)\nsystem("rm -rf /")')
     assert not result.ok and any(i.rule=='system_call' for i in result.issues)
 def test_generation(tmp_path):
-    backend=StaticJSONBackend({'code':'library(ggplot2)\ndir.create("figures",showWarnings=FALSE)\np<-ggplot(iris,aes(Sepal.Length,Sepal.Width))+geom_point()\nggsave("figures/scatter.png",p)','expected_outputs':['figures/scatter.png'],'knowledge_ids':['DOC-1']})
+    backend=StaticJSONBackend({'code':'library(ggplot2)\ndir.create("figures",showWarnings=FALSE)\np<-ggplot(iris,aes(Sepal.Length,Sepal.Width))+geom_point()\nggsave("figures/*.png",p)','expected_outputs':['figures/scatter.png'],'knowledge_ids':['DOC-1']})
     context=JobContext.create(user_request='Generate').model_copy(update={'state':{'course_outline':OUTLINE,'workflow_plan':PLAN,'local_knowledge_results':[{'document_id':'DOC-1'}]}})
     result=RCodeGenerationAgent(backend,output_dir=tmp_path).run(context)
     assert result.status.value=='success' and result.metrics['generated_r_scripts']==1

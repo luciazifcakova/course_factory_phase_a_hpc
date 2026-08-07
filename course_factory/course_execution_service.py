@@ -38,7 +38,7 @@ from .workspace_manager import WorkspaceManager
 
 REPAIR_SCHEMA = '''{
   "code": "complete corrected R script",
-  "expected_outputs": ["exact required relative output path"],
+  "expected_outputs": ["all concrete relative output paths required by this script"],
   "knowledge_ids": []
 }'''
 
