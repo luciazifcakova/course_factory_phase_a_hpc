@@ -176,6 +176,18 @@ def base_context(tmp_path):
     )
 
 
+def valid_intent():
+    return {
+        "lesson_id": "LES-001",
+        "lesson_title": "Scatter plots",
+        "slides": [
+            {"slide_id":"LES-001-S01","lesson_id":"LES-001","title":"Scatter plots","purpose":"Introduce the lesson and its goal.","kind":"overview","wants_visual":False,"wants_code":False},
+            {"slide_id":"LES-001-S02","lesson_id":"LES-001","title":"Scatter example","purpose":"Explain geom_point with a worked visual.","kind":"example","wants_visual":True,"wants_code":False},
+            {"slide_id":"LES-001-S03","lesson_id":"LES-001","title":"Try it","purpose":"Give learners a short practical task.","kind":"exercise","wants_visual":False,"wants_code":False},
+        ],
+    }
+
+
 def valid_plan():
     return {
         "lesson_id": "LES-001",
@@ -262,28 +274,14 @@ def valid_text():
     }
 
 
-def test_planner_rejects_invented_figure_and_repairs(
-    tmp_path,
-):
-    invalid = valid_plan()
-    invalid["slides"][1]["figure_artifacts"] = [
-        "figures/invented.png"
-    ]
-
-    backend = SequenceBackend(
-        [invalid, valid_plan()]
-    )
-    result = SlidePlannerAgent(
-        backend,
-        trace_dir=tmp_path / "llm",
-        max_attempts=3,
-    ).run(base_context(tmp_path))
-
+def test_planner_resolves_figure_without_llm_path(tmp_path):
+    backend = SequenceBackend([valid_intent()])
+    result = SlidePlannerAgent(backend, trace_dir=tmp_path / "llm", max_attempts=3).run(base_context(tmp_path))
     assert result.status.value == "success"
-    assert backend.calls == 2
-    assert result.metrics[
-        "slide_planner_retries"
-    ] == 1
+    assert backend.calls == 1
+    visual = result.outputs["slide_plan"]["lessons"][0]["slides"][1]
+    assert visual["layout"] == "figure_bullets"
+    assert visual["figure_artifacts"] == ["tasks/LES-001.r_code/output/figures/scatter.png"]
 
 
 def test_slide_content_uses_fixed_plan_artifacts(

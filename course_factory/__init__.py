@@ -181,10 +181,14 @@ from .slide_models import (
     SlideDeck,
     SlideGenerationAttempt,
     SlideGenerationReport,
+    LessonSlideIntent,
+    SlideIntentItem,
+    SlideIntentKind,
     SlideLayout,
     SlidePlanItem,
     SlideText,
 )
+from .slide_layout_resolver import SlideLayoutResolver
 from .source_quality import SourceQualityScorer
 from .state_machine import StateMachine, WorkflowStage
 from .supervisor import Supervisor, SupervisorRun

@@ -20,6 +20,51 @@ class SlideLayout(StrEnum):
     SUMMARY = "summary"
 
 
+class SlideIntentKind(StrEnum):
+    OVERVIEW = "overview"
+    CONCEPT = "concept"
+    EXAMPLE = "example"
+    CODE_EXAMPLE = "code_example"
+    EXERCISE = "exercise"
+    SUMMARY = "summary"
+
+
+class SlideIntentItem(BaseModel):
+    """LLM-facing educational intent; no layout or artifact paths."""
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    slide_id: str = Field(min_length=1, max_length=80)
+    lesson_id: str = Field(min_length=1, max_length=80)
+    title: str = Field(min_length=2, max_length=120)
+    purpose: str = Field(min_length=5, max_length=300)
+    kind: SlideIntentKind = SlideIntentKind.CONCEPT
+    wants_visual: bool = False
+    wants_code: bool = False
+
+    @model_validator(mode="after")
+    def validate_intent(self) -> "SlideIntentItem":
+        if self.kind is SlideIntentKind.CODE_EXAMPLE and not self.wants_code:
+            raise ValueError("code_example intent requires wants_code=true")
+        if self.kind is not SlideIntentKind.CODE_EXAMPLE and self.wants_code:
+            raise ValueError("wants_code=true is only valid for code_example intent")
+        return self
+
+
+class LessonSlideIntent(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    lesson_id: str = Field(min_length=1)
+    lesson_title: str = Field(min_length=2)
+    slides: tuple[SlideIntentItem, ...] = Field(min_length=2, max_length=12)
+
+    @model_validator(mode="after")
+    def validate_ids(self) -> "LessonSlideIntent":
+        ids = [slide.slide_id for slide in self.slides]
+        if len(ids) != len(set(ids)):
+            raise ValueError("slide_id values must be unique within a lesson")
+        if any(slide.lesson_id != self.lesson_id for slide in self.slides):
+            raise ValueError("all slide intents must use the parent lesson_id")
+        return self
+
+
 class SlidePlanItem(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
