@@ -2,7 +2,7 @@ from __future__ import annotations
 from .agent import Agent
 from .agent_result import AgentResult
 from .job_context import JobContext
-from .llm_backend import LLMBackend
+from .llm_backend import LLMBackend, ensure_structured_backend
 from .review_models import ReviewReport, RepairResult
 
 REPAIR_SCHEMA = '{"artifact_name":"slide_deck","repaired_payload":{},"change_summary":["string"],"attempt":1}'
@@ -12,10 +12,11 @@ class RepairAgent(Agent):
     capabilities = frozenset({"content_repair"})
 
     def __init__(self, backend: LLMBackend):
-        self.backend = backend
+        self.backend = ensure_structured_backend(backend)
 
     def _repair(self, artifact_name, payload, report, attempt):
-        response = self.backend.generate_json(
+        return self.backend.generate_structured(
+            RepairResult,
             system=(
                 "Repair the course artifact using the review issues. "
                 "Preserve IDs, citations, technical meaning, and schema shape."
@@ -26,9 +27,7 @@ class RepairAgent(Agent):
                 "review": report.model_dump(mode="json"),
                 "attempt": attempt,
             }),
-            schema_hint=REPAIR_SCHEMA,
         )
-        return RepairResult.model_validate(response)
 
     def run(self, context: JobContext) -> AgentResult:
         review = context.state.get("content_review")

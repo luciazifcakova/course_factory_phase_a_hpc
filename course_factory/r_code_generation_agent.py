@@ -13,7 +13,7 @@ from .agent_result import AgentResult
 from .course_outline import CourseOutline
 from .job_context import JobContext
 from .lesson_content_models import LessonContentSet
-from .llm_backend import LLMBackend
+from .llm_backend import LLMBackend, StructuredOutputError, ensure_structured_backend
 from .r_code_models import (
     RCodeGenerationAttempt,
     RCodeGenerationReport,
@@ -41,7 +41,7 @@ class RCodeGenerationAgent(Agent):
         if max_attempts < 1:
             raise ValueError("max_attempts must be at least one")
 
-        self.backend = backend
+        self.backend = ensure_structured_backend(backend)
         self.output_dir = Path(output_dir)
         self.trace_dir = (
             Path(trace_dir)
@@ -357,31 +357,15 @@ class RCodeGenerationAgent(Agent):
 
                     raw_response: dict = {}
                     try:
-                        raw_response = (
-                            self.backend.generate_json(
-                                system=system,
-                                user=user_prompt,
-                                schema_hint=schema,
-                            )
+                        validated = self.backend.generate_structured(
+                            RCodeLLMResponse,
+                            system=system,
+                            user=user_prompt,
                         )
-                        if not isinstance(
-                            raw_response,
-                            dict,
-                        ):
-                            raise TypeError(
-                                "LLM backend returned a "
-                                "non-object JSON value."
-                            )
-
+                        raw_response = validated.model_dump(mode="json")
                         self._write_json(
                             response_path,
                             raw_response,
-                        )
-
-                        validated = (
-                            RCodeLLMResponse.model_validate(
-                                raw_response
-                            )
                         )
                         returned_outputs = tuple(
                             validated.expected_outputs
@@ -466,6 +450,12 @@ class RCodeGenerationAgent(Agent):
                         break
 
                     except Exception as exc:
+                        if isinstance(exc, StructuredOutputError) and exc.raw_content:
+                            try:
+                                raw_response = json.loads(exc.raw_content)
+                            except Exception:
+                                raw_response = {"_raw_content": exc.raw_content}
+                            self._write_json(response_path, raw_response)
                         final_errors = (
                             self._validation_messages(exc)
                         )

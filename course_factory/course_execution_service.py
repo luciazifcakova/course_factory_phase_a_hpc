@@ -19,7 +19,7 @@ from .course_request_models import (
     CreateCourseRequest,
 )
 from .hpc_settings import HPCSettings
-from .llm_backend import LLMBackend
+from .llm_backend import LLMBackend, ensure_structured_backend
 from .local_runtime import LocalRuntimeBackend
 from .r_code_models import (
     RCodeLLMResponse,
@@ -55,7 +55,7 @@ class CourseExecutionService:
     ) -> None:
         self.settings = settings
         self.workspace = workspace
-        self.backend = backend
+        self.backend = ensure_structured_backend(backend) if backend is not None else None
         self.max_repair_attempts = (
             settings.r_execution_repair_attempts
             if max_repair_attempts is None
@@ -270,14 +270,13 @@ class CourseExecutionService:
             )
 
         try:
-            raw = self.backend.generate_json(
+            response = self.backend.generate_structured(
+                RCodeLLMResponse,
                 system=system,
                 user=user,
-                schema_hint=REPAIR_SCHEMA,
             )
+            raw = response.model_dump(mode="json")
             self._write_json(response_path, raw)
-
-            response = RCodeLLMResponse.model_validate(raw)
             if (
                 set(response.expected_outputs)
                 != set(script.expected_outputs)

@@ -4,7 +4,7 @@ from .agent import Agent
 from .agent_result import AgentResult
 from .course_outline import CourseOutline
 from .job_context import JobContext
-from .llm_backend import LLMBackend
+from .llm_backend import LLMBackend, ensure_structured_backend
 from .slide_models import SlideDeck
 
 SLIDE_SCHEMA = '''{
@@ -29,7 +29,7 @@ class SlideContentAgent(Agent):
     capabilities = frozenset({"slide_generation"})
 
     def __init__(self, backend: LLMBackend):
-        self.backend = backend
+        self.backend = ensure_structured_backend(backend)
 
     def run(self, context: JobContext) -> AgentResult:
         outline_raw = context.state.get("course_outline")
@@ -48,7 +48,8 @@ class SlideContentAgent(Agent):
         try:
             outline = CourseOutline.model_validate(outline_raw)
             knowledge = context.state.get("local_knowledge_results", [])
-            response = self.backend.generate_json(
+            deck = self.backend.generate_structured(
+                SlideDeck,
                 system=(
                     "You are an expert R instructor. Generate concise teaching slides. "
                     "Every factual statement must be supported by supplied knowledge. "
@@ -59,9 +60,7 @@ class SlideContentAgent(Agent):
                     f"WORKFLOW PLAN:\n{workflow_raw}\n\n"
                     f"KNOWLEDGE:\n{knowledge}"
                 ),
-                schema_hint=SLIDE_SCHEMA,
             )
-            deck = SlideDeck.model_validate(response)
             valid_lesson_ids = {
                 lesson.lesson_id
                 for module in outline.modules

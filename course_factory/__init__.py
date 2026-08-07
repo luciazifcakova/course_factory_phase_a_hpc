@@ -1,3 +1,11 @@
+from .llm_backend import (
+    LLMBackend,
+    LegacyBackendAdapter,
+    OllamaBackend,
+    StaticJSONBackend,
+    StructuredOutputError,
+    ensure_structured_backend,
+)
 from .course_execution_models import (
     CourseExecutionReport,
     CourseScriptExecution,

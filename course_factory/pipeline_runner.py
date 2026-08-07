@@ -206,7 +206,13 @@ class PipelineRunner:
             )
 
             lesson_result = LessonGenerationAgent(
-                self.backend
+                self.backend,
+                trace_dir=(
+                    directory
+                    / "llm"
+                    / "lesson_generation"
+                ),
+                max_attempts=3,
             ).run(context)
             if lesson_result.status is not AgentStatus.SUCCESS:
                 raise RuntimeError(

@@ -3,7 +3,7 @@ from .agent import Agent
 from .agent_result import AgentResult
 from .course_specification import CourseSpecification
 from .job_context import JobContext
-from .llm_backend import LLMBackend
+from .llm_backend import LLMBackend, ensure_structured_backend
 from .prompt_builder import (
     INPUT_BUILDER_PROMPT_VERSION,
     build_input_builder_prompt,
@@ -16,18 +16,17 @@ class InputBuilderAgent(Agent):
     capabilities = frozenset({"input_builder"})
 
     def __init__(self, backend: LLMBackend) -> None:
-        self.backend = backend
+        self.backend = ensure_structured_backend(backend)
 
     def run(self, context: JobContext) -> AgentResult:
         attempt = context.retry_counts.get("input_builder", 0) + 1
         try:
             system, user, schema_hint = build_input_builder_prompt(context.user_request)
-            raw = self.backend.generate_json(
+            spec = self.backend.generate_structured(
+                CourseSpecification,
                 system=system,
                 user=user,
-                schema_hint=schema_hint,
             )
-            spec = CourseSpecification.model_validate(raw)
         except Exception as exc:
             return AgentResult.retry(
                 agent_name=self.name,

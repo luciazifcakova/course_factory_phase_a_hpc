@@ -6,7 +6,7 @@ from .course_outline import CourseOutline
 from .exercise_models import ExerciseSet
 from .exercise_validator import ExerciseValidator
 from .job_context import JobContext
-from .llm_backend import LLMBackend
+from .llm_backend import LLMBackend, ensure_structured_backend
 
 EXERCISE_SCHEMA = '''{
   "course_title": "string",
@@ -43,7 +43,7 @@ class ExerciseGenerationAgent(Agent):
     capabilities = frozenset({"exercise_generation"})
 
     def __init__(self, backend: LLMBackend):
-        self.backend = backend
+        self.backend = ensure_structured_backend(backend)
         self.validator = ExerciseValidator()
 
     def run(self, context: JobContext) -> AgentResult:
@@ -57,7 +57,8 @@ class ExerciseGenerationAgent(Agent):
         try:
             outline = CourseOutline.model_validate(outline_raw)
             knowledge = context.state.get("local_knowledge_results", [])
-            response = self.backend.generate_json(
+            exercise_set = self.backend.generate_structured(
+                ExerciseSet,
                 system=(
                     "You are an expert R instructor. Create practical exercises and "
                     "complete solutions aligned to the supplied lessons. Use only supplied "
@@ -68,9 +69,7 @@ class ExerciseGenerationAgent(Agent):
                     f"COURSE OUTLINE:\n{outline.model_dump_json(indent=2)}\n\n"
                     f"VALIDATED KNOWLEDGE:\n{knowledge}"
                 ),
-                schema_hint=EXERCISE_SCHEMA,
             )
-            exercise_set = ExerciseSet.model_validate(response)
             validation = self.validator.validate(
                 outline=outline,
                 exercise_set=exercise_set,
