@@ -104,15 +104,34 @@ class RWorkflowPlannerAgent(Agent):
             agent_name=self.name,
             outputs={"workflow_plan": plan.model_dump(mode="json")},
             metrics={
+                # Legacy metric names retained for API compatibility.
+                # They describe PLANNED workflow nodes, not generated files.
                 "workflow_task_count": len(plan.tasks),
                 "r_script_task_count": sum(
-                    task.task_type is TaskType.R_SCRIPT for task in plan.tasks
+                    task.task_type is TaskType.R_SCRIPT
+                    for task in plan.tasks
                 ),
                 "figure_task_count": sum(
-                    task.task_type is TaskType.FIGURE for task in plan.tasks
+                    task.task_type is TaskType.FIGURE
+                    for task in plan.tasks
                 ),
                 "slide_task_count": sum(
-                    task.task_type is TaskType.SLIDE_CONTENT for task in plan.tasks
+                    task.task_type is TaskType.SLIDE_CONTENT
+                    for task in plan.tasks
+                ),
+                # Unambiguous names used by observability/reporting.
+                "planned_workflow_task_count": len(plan.tasks),
+                "planned_r_script_task_count": sum(
+                    task.task_type is TaskType.R_SCRIPT
+                    for task in plan.tasks
+                ),
+                "planned_figure_task_count": sum(
+                    task.task_type is TaskType.FIGURE
+                    for task in plan.tasks
+                ),
+                "planned_slide_task_count": sum(
+                    task.task_type is TaskType.SLIDE_CONTENT
+                    for task in plan.tasks
                 ),
             },
         )

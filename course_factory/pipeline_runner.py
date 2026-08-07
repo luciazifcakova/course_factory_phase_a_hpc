@@ -27,6 +27,15 @@ from .job_context import JobContext
 from .job_manager import JobManager
 from .llm_backend import LLMBackend
 from .types import AgentStatus
+from .workflow_plan import WorkflowPlan
+from .job_artifacts import (
+    build_artifact_manifest,
+    build_observability_metrics,
+    render_job_index,
+    render_job_summary,
+)
+from .slide_planner_agent import SlidePlannerAgent
+from .slide_generation_agent import SlideGenerationAgent
 
 
 class PipelineRunner:
@@ -378,6 +387,7 @@ class PipelineRunner:
                 )
 
             execution_report = None
+            execution_report_model = None
             execution_metrics = {}
 
             if request.executor is not CourseExecutor.NONE:
@@ -432,6 +442,7 @@ class PipelineRunner:
                             ".csv": "text/csv",
                             ".tsv": "text/tab-separated-values",
                             ".json": "application/json",
+                            ".pdf": "application/pdf",
                         }.get(
                             suffix,
                             "application/octet-stream",
@@ -502,6 +513,279 @@ class PipelineRunner:
                 if execution_report is not None
                 else "r_scripts_complete"
             )
+
+            typed_outline = CourseOutline.model_validate(
+                outline
+            )
+            typed_lessons = LessonContentSet.model_validate(
+                lesson_content_raw
+            )
+            typed_workflow = WorkflowPlan.model_validate(
+                workflow_plan
+            )
+            typed_scripts = tuple(
+                RScriptArtifact.model_validate(script)
+                for script
+                in context.state["approved_r_scripts"]
+            )
+
+            observability_metrics = build_observability_metrics(
+                workflow_plan=typed_workflow,
+                approved_scripts=typed_scripts,
+                execution_report=execution_report_model,
+            )
+
+            # Keep existing public metrics, while adding unambiguous file-
+            # and execution-level counters.
+            final_metrics = {
+                **input_result.metrics,
+                **planner_result.metrics,
+                **lesson_result.metrics,
+                **workflow_result.metrics,
+                **r_result.metrics,
+                **security_result.metrics,
+                **execution_metrics,
+                **observability_metrics,
+            }
+
+            metrics_artifact = self._write_json(
+                directory,
+                "metrics.json",
+                final_metrics,
+            )
+            artifacts.append(metrics_artifact)
+
+            manifest = build_artifact_manifest(
+                job_id=job_id,
+                job_directory=directory,
+                outline=typed_outline,
+                lesson_content=typed_lessons,
+                lesson_paths=lesson_paths,
+                approved_scripts=typed_scripts,
+                execution_report=execution_report_model,
+                summary_metrics=final_metrics,
+            )
+            manifest_artifact = self._write_json(
+                directory,
+                "artifact_manifest.json",
+                manifest.model_dump(mode="json"),
+            )
+            artifacts.append(manifest_artifact)
+
+            slide_metrics = {}
+            slide_plan = None
+            slide_deck = None
+            slide_generation_report = None
+
+            if "slides" in request.output_formats:
+                self.jobs.transition(
+                    job_id=job_id,
+                    status="running",
+                    step="slide_planning",
+                    patch={
+                        "artifact_manifest": (
+                            manifest.model_dump(
+                                mode="json"
+                            )
+                        ),
+                    },
+                    message=(
+                        "Planning lesson slides from validated "
+                        "lesson artifacts."
+                    ),
+                )
+
+                slide_context = context.model_copy(
+                    update={
+                        "state": {
+                            **context.state,
+                            "artifact_manifest": (
+                                manifest.model_dump(
+                                    mode="json"
+                                )
+                            ),
+                        }
+                    }
+                )
+
+                slide_plan_result = SlidePlannerAgent(
+                    self.backend,
+                    trace_dir=(
+                        directory
+                        / "llm"
+                        / "slide_planning"
+                    ),
+                    max_attempts=3,
+                ).run(slide_context)
+
+                if slide_plan_result.status is not AgentStatus.SUCCESS:
+                    raise RuntimeError(
+                        "; ".join(
+                            slide_plan_result.errors
+                        )
+                        or "Slide planning failed."
+                    )
+
+                slide_context = slide_context.with_result(
+                    slide_plan_result
+                )
+                slide_plan = slide_context.state[
+                    "slide_plan"
+                ]
+                artifacts.append(
+                    self._write_json(
+                        directory,
+                        "slide_plan.json",
+                        slide_plan,
+                    )
+                )
+
+                self.jobs.transition(
+                    job_id=job_id,
+                    status="running",
+                    step="slide_generation",
+                    patch={
+                        "slide_plan": slide_plan,
+                    },
+                    message=(
+                        "Generating structured slide content."
+                    ),
+                )
+
+                slide_result = SlideGenerationAgent(
+                    self.backend,
+                    output_dir=(
+                        directory / "slides"
+                    ),
+                    trace_dir=(
+                        directory
+                        / "llm"
+                        / "slide_generation"
+                    ),
+                    max_attempts=3,
+                ).run(slide_context)
+
+                if slide_result.status is not AgentStatus.SUCCESS:
+                    raise RuntimeError(
+                        "; ".join(
+                            slide_result.errors
+                        )
+                        or "Slide generation failed."
+                    )
+
+                slide_context = slide_context.with_result(
+                    slide_result
+                )
+                slide_deck = slide_context.state[
+                    "slide_deck"
+                ]
+                slide_generation_report = dict(
+                    slide_context.state[
+                        "slide_generation_report"
+                    ]
+                )
+                slide_generation_report[
+                    "planner_attempts"
+                ] = slide_plan_result.metrics.get(
+                    "slide_planner_attempts",
+                    0,
+                )
+                slide_generation_report[
+                    "retries"
+                ] = (
+                    slide_plan_result.metrics.get(
+                        "slide_planner_retries",
+                        0,
+                    )
+                    + slide_result.metrics.get(
+                        "slide_content_retries",
+                        0,
+                    )
+                )
+                slide_generation_report[
+                    "attempts"
+                ] = (
+                    slide_plan_result.outputs.get(
+                        "slide_planning_attempts",
+                        [],
+                    )
+                    + slide_generation_report.get(
+                        "attempts",
+                        [],
+                    )
+                )
+
+                artifacts.append(
+                    self._write_json(
+                        directory,
+                        "slide_deck.json",
+                        slide_deck,
+                    )
+                )
+                artifacts.append(
+                    self._write_json(
+                        directory,
+                        "slide_generation_report.json",
+                        slide_generation_report,
+                    )
+                )
+
+                for slide_file in sorted(
+                    (directory / "slides").glob(
+                        "LES-*.json"
+                    )
+                ):
+                    artifacts.append(
+                        CourseArtifact(
+                            name=slide_file.stem,
+                            path=str(slide_file),
+                            content_type=(
+                                "application/json"
+                            ),
+                        )
+                    )
+
+                slide_metrics = {
+                    **slide_plan_result.metrics,
+                    **slide_result.metrics,
+                }
+                final_metrics = {
+                    **final_metrics,
+                    **slide_metrics,
+                }
+                self._write_json(
+                    directory,
+                    "metrics.json",
+                    final_metrics,
+                )
+                final_step = "slides_complete"
+
+            index_path = directory / "index.html"
+            index_path.write_text(
+                render_job_index(manifest),
+                encoding="utf-8",
+            )
+            artifacts.append(
+                CourseArtifact(
+                    name="job_index",
+                    path=str(index_path),
+                    content_type="text/html",
+                )
+            )
+
+            summary_path = directory / "job_summary.txt"
+            summary_path.write_text(
+                render_job_summary(manifest),
+                encoding="utf-8",
+            )
+            artifacts.append(
+                CourseArtifact(
+                    name="job_summary",
+                    path=str(summary_path),
+                    content_type="text/plain",
+                )
+            )
+
             artifact_payload = [
                 artifact.model_dump(mode="json")
                 for artifact in artifacts
@@ -516,6 +800,21 @@ class PipelineRunner:
                 "approved_r_scripts": (
                     context.state["approved_r_scripts"]
                 ),
+                "metrics": final_metrics,
+                "artifact_manifest": (
+                    manifest.model_dump(mode="json")
+                ),
+                **(
+                    {
+                        "slide_plan": slide_plan,
+                        "slide_deck": slide_deck,
+                        "slide_generation_report": (
+                            slide_generation_report
+                        ),
+                    }
+                    if slide_deck is not None
+                    else {}
+                ),
                 "artifacts": artifact_payload,
             }
             if execution_report is not None:
@@ -529,11 +828,15 @@ class PipelineRunner:
                 step=final_step,
                 patch=state_patch,
                 message=(
-                    "Course lessons, approved R scripts and "
-                    "execution artifacts created successfully."
-                    if execution_report is not None
-                    else "Course lessons and security-approved "
-                    "R scripts created successfully."
+                    "Structured lesson slides created successfully."
+                    if slide_deck is not None
+                    else (
+                        "Course lessons, approved R scripts and "
+                        "execution artifacts created successfully."
+                        if execution_report is not None
+                        else "Course lessons and security-approved "
+                        "R scripts created successfully."
+                    )
                 ),
             )
 
@@ -544,23 +847,20 @@ class PipelineRunner:
                 job_directory=str(directory),
                 artifacts=tuple(artifacts),
                 message=(
-                    "Course specification, outline, Markdown "
-                    "lessons, R scripts and executed outputs "
-                    "were created."
-                    if execution_report is not None
-                    else "Course specification, outline, "
-                    "Markdown lessons and security-approved "
-                    "R teaching scripts were created."
+                    "Course specification, lessons, R artifacts and "
+                    "structured slide JSON were created."
+                    if slide_deck is not None
+                    else (
+                        "Course specification, outline, Markdown "
+                        "lessons, R scripts and executed outputs "
+                        "were created."
+                        if execution_report is not None
+                        else "Course specification, outline, "
+                        "Markdown lessons and security-approved "
+                        "R teaching scripts were created."
+                    )
                 ),
-                metrics={
-                    **input_result.metrics,
-                    **planner_result.metrics,
-                    **lesson_result.metrics,
-                    **workflow_result.metrics,
-                    **r_result.metrics,
-                    **security_result.metrics,
-                    **execution_metrics,
-                },
+                metrics=final_metrics,
             )
 
         except Exception as exc:

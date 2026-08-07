@@ -11,6 +11,9 @@ output_formats:
   - course_outline
   - lesson_content
   - markdown_lessons
+  - r_scripts
+  - execution_outputs
+  - slides
 
 # Use local or slurm to execute generated scripts.
 executor: none

@@ -259,6 +259,15 @@ def command_create_course(args) -> int:
                 execution_memory_gb=args.memory_gb,
                 execution_time_minutes=args.time_minutes,
                 execution_partition=args.partition,
+                output_formats=(
+                    "course_specification",
+                    "course_outline",
+                    "lesson_content",
+                    "markdown_lessons",
+                    "r_scripts",
+                    "execution_outputs",
+                    "slides",
+                ),
             ),
             job_id=args.job_id,
         )

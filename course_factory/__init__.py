@@ -1,3 +1,12 @@
+from .job_artifacts import (
+    ArtifactManifest,
+    LessonArtifactManifest,
+    ManifestFile,
+    build_artifact_manifest,
+    build_observability_metrics,
+    render_job_index,
+    render_job_summary,
+)
 from .llm_backend import (
     LLMBackend,
     LegacyBackendAdapter,
@@ -161,7 +170,21 @@ from .retriever import (
     RetrievalResult,
 )
 from .slide_content_agent import SlideContentAgent
-from .slide_models import Slide, SlideDeck
+from .slide_planner_agent import SlidePlannerAgent
+from .slide_generation_agent import SlideGenerationAgent
+from .slide_models import (
+    CourseSlidePlan,
+    LessonSlideDeck,
+    LessonSlidePlan,
+    LessonSlideText,
+    Slide,
+    SlideDeck,
+    SlideGenerationAttempt,
+    SlideGenerationReport,
+    SlideLayout,
+    SlidePlanItem,
+    SlideText,
+)
 from .source_quality import SourceQualityScorer
 from .state_machine import StateMachine, WorkflowStage
 from .supervisor import Supervisor, SupervisorRun

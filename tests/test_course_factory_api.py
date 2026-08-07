@@ -208,7 +208,7 @@ def test_api_creates_specification_outline_and_lessons(tmp_path):
 
     assert result.status == "completed"
     assert result.current_step == "r_scripts_complete"
-    assert len(result.artifacts) == 11
+    assert len(result.artifacts) == 15
 
     job_dir = tmp_path / "workspace" / "jobs" / "job_test"
     assert (job_dir / "course_specification.json").is_file()

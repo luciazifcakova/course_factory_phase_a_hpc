@@ -44,6 +44,11 @@ class CreateCourseRequest(BaseModel):
         allowed = {
             "course_specification",
             "course_outline",
+            "lesson_content",
+            "markdown_lessons",
+            "r_scripts",
+            "execution_outputs",
+            "slides",
         }
         unknown = set(self.output_formats) - allowed
         if unknown:
